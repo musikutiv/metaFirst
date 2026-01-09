@@ -20,10 +20,11 @@ This system implements a **metadata-first** approach where:
    - REST API for metadata management
    - Multi-tenant: stores metadata for multiple projects
 
-2. **User Ingestion Helper** (Python + watchdog) - *Planned*
+2. **User Ingestion Helper** (Python + watchdog) - *Implemented*
    - Runs locally on user machines
    - Watches folders for new files
-   - Submits metadata to supervisor
+   - Submits metadata to supervisor via API
+   - Links files to samples with optional metadata prompting
 
 3. **Federated Discovery Index** (FastAPI + SQLite) - *Planned*
    - Separate service for cross-project search
@@ -73,6 +74,148 @@ The API will be available at http://localhost:8000
 
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/health
+
+## Watched-Folder Ingestion
+
+The user ingestion helper watches configured folders on user machines and automatically registers new raw data files in the supervisor.
+
+### Setup
+
+1. **Create Storage Roots via API**
+
+   First, create a storage root for your project (requires `can_manage_rdmp` permission):
+
+   ```bash
+   # Login as Alice (PI in project 1)
+   TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "username=alice&password=demo123" | jq -r .access_token)
+
+   # Create a storage root
+   curl -X POST http://localhost:8000/api/projects/1/storage-roots \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Lab NAS", "description": "Network attached storage"}'
+   ```
+
+2. **Create Storage Root Mapping**
+
+   Each user maps the storage root to their local mount path:
+
+   ```bash
+   # Replace 1 with your storage_root_id
+   curl -X POST http://localhost:8000/api/storage-roots/1/mappings \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"local_mount_path": "/Users/alice/data"}'
+   ```
+
+3. **Configure the Ingest Helper**
+
+   ```bash
+   cd ingest_helper
+   pip install -r requirements.txt
+   cp config.example.yaml config.yaml
+   # Edit config.yaml with your settings
+   ```
+
+   Example `config.yaml`:
+
+   ```yaml
+   supervisor_url: http://localhost:8000
+   username: alice
+   password: demo123
+   max_field_prompts: 3
+   compute_hash: false
+   watchers:
+     - watch_path: /Users/alice/data/qpcr
+       project_id: 1
+       storage_root_id: 1
+       sample_identifier_pattern: "^([A-Z]+-\\d+)"
+   ```
+
+4. **Run the Ingest Helper**
+
+   ```bash
+   python metafirst_ingest.py config.yaml
+   ```
+
+### Demo: Watch a Folder and Ingest Files
+
+1. **Start the supervisor** (in one terminal):
+   ```bash
+   cd supervisor
+   source venv/bin/activate
+   uvicorn supervisor.main:app --reload --port 8000
+   ```
+
+2. **Seed demo data** (if not already done):
+   ```bash
+   python demo/seed.py
+   ```
+
+3. **Create storage root and mapping** (using the API commands above)
+
+4. **Create a test data folder**:
+   ```bash
+   mkdir -p /Users/alice/data/qpcr
+   ```
+
+5. **Start the ingest helper** (in another terminal):
+   ```bash
+   cd ingest_helper
+   python metafirst_ingest.py config.yaml
+   ```
+
+6. **Drop a file into the watched folder**:
+   ```bash
+   echo "gene,expression" > /Users/alice/data/qpcr/QPCR-001_results.csv
+   ```
+
+7. **Observe the ingest helper**:
+   - It will detect the new file
+   - Extract sample identifier (e.g., `QPCR-001` from the filename)
+   - Prompt you to confirm or change the identifier
+   - Create/find the sample in the project
+   - Register the raw data reference
+   - Optionally prompt for required RDMP fields
+
+8. **Verify in supervisor**:
+   ```bash
+   # List raw data items
+   curl -X GET "http://localhost:8000/api/projects/1/raw-data" \
+     -H "Authorization: Bearer $TOKEN"
+
+   # Get sample details (shows linked raw data)
+   curl -X GET "http://localhost:8000/api/samples/1" \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+
+### API Endpoints for Storage and Raw Data
+
+#### Storage Roots (`/api`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{id}/storage-roots` | Create storage root |
+| GET | `/projects/{id}/storage-roots` | List storage roots |
+
+#### Storage Root Mappings (`/api`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/storage-roots/{id}/mappings` | Create/update user mapping |
+| GET | `/storage-roots/{id}/mappings` | List mappings |
+
+#### Raw Data Items (`/api`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{id}/raw-data` | Register raw data item |
+| GET | `/projects/{id}/raw-data` | List raw data (filter by sample_id) |
+| GET | `/raw-data/{id}` | Get raw data item details |
+| PUT | `/raw-data/{id}/path` | Update path (audited) |
+| GET | `/raw-data/{id}/path-history` | Get path change history |
 
 ## Demo Data Structure
 
@@ -270,10 +413,16 @@ metaFirst/
 │   │   ├── models/            # SQLAlchemy ORM models
 │   │   ├── schemas/           # Pydantic request/response models
 │   │   ├── api/               # FastAPI route handlers
-│   │   ├── services/          # Business logic (RDMP validation, permissions)
+│   │   ├── services/          # Business logic (RDMP, permissions, audit)
 │   │   └── utils/             # Security, validation utilities
+│   ├── tests/                 # Test suite
 │   ├── alembic/               # Database migrations
 │   └── pyproject.toml         # Dependencies
+│
+├── ingest_helper/             # User-side file watcher
+│   ├── metafirst_ingest.py    # Main ingest script
+│   ├── config.example.yaml    # Example configuration
+│   └── requirements.txt       # Dependencies
 │
 ├── demo/                      # Demo data seeding
 │   ├── seed.py                # Seeding script
@@ -298,17 +447,20 @@ metaFirst/
 - [x] 4 RDMP template examples
 - [x] Demo data seeding (5 users, 3 projects, 4 samples)
 
-### 🚧 Planned (Models exist, APIs not implemented)
+### 🚧 Planned
 
-- [ ] Storage roots and mappings
-- [ ] Raw data reference management
-- [ ] Path change tracking with audit
-- [ ] Audit logging service
 - [ ] Release management (freeze snapshots)
 - [ ] Release corrections (linked new releases)
 - [ ] Federated discovery index
-- [ ] User ingestion helper (file watcher)
 - [ ] React frontend UI
+
+### ✅ Recently Implemented
+
+- [x] Storage roots and mappings API
+- [x] Raw data reference management API
+- [x] Path change tracking with audit
+- [x] Audit logging service
+- [x] User ingestion helper (watchdog-based file watcher)
 
 ## API Endpoints
 
