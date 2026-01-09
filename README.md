@@ -26,7 +26,12 @@ This system implements a **metadata-first** approach where:
    - Submits metadata to supervisor via API
    - Links files to samples with optional metadata prompting
 
-3. **Federated Discovery Index** (FastAPI + SQLite) - *Planned*
+3. **Metadata Viewer UI** (React + Vite) - *Implemented*
+   - Read-only table view of sample metadata
+   - RDMP-driven dynamic columns
+   - Project selection and completeness indicators
+
+4. **Federated Discovery Index** (FastAPI + SQLite) - *Planned*
    - Separate service for cross-project search
    - Respects RDMP visibility policies
 
@@ -35,6 +40,7 @@ This system implements a **metadata-first** approach where:
 ### Prerequisites
 
 - Python 3.11 or later
+- Node.js 18 or later (for UI)
 - Git
 
 ### 1. Installation
@@ -74,6 +80,21 @@ The API will be available at http://localhost:8000
 
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/health
+
+### 4. Start the Metadata Viewer UI (Optional)
+
+```bash
+# In a new terminal
+cd supervisor-ui
+npm install
+npm run dev
+```
+
+The UI will be available at http://localhost:5173
+
+- Login with any demo user (e.g., alice / demo123)
+- Select a project to view its metadata table
+- Columns are dynamically generated from RDMP field definitions
 
 ## Watched-Folder Ingestion
 
@@ -424,6 +445,16 @@ metaFirst/
 │   ├── config.example.yaml    # Example configuration
 │   └── requirements.txt       # Dependencies
 │
+├── supervisor-ui/             # React frontend
+│   ├── src/
+│   │   ├── api/client.ts      # API client
+│   │   ├── components/        # React components
+│   │   ├── types.ts           # TypeScript types
+│   │   ├── App.tsx            # Main app component
+│   │   └── main.tsx           # Entry point
+│   ├── package.json           # Dependencies
+│   └── vite.config.ts         # Vite configuration
+│
 ├── demo/                      # Demo data seeding
 │   ├── seed.py                # Seeding script
 │   └── rdmp_templates/        # 4 RDMP template JSON files
@@ -452,7 +483,6 @@ metaFirst/
 - [ ] Release management (freeze snapshots)
 - [ ] Release corrections (linked new releases)
 - [ ] Federated discovery index
-- [ ] React frontend UI
 
 ### ✅ Recently Implemented
 
@@ -461,6 +491,7 @@ metaFirst/
 - [x] Path change tracking with audit
 - [x] Audit logging service
 - [x] User ingestion helper (watchdog-based file watcher)
+- [x] Read-only metadata table UI (React + Vite)
 
 ## API Endpoints
 
