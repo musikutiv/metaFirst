@@ -15,7 +15,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="RDM Supervisor",
     description="Metadata-first Research Data Management supervisor service",
-    version="1.0.0"
+    version="1.0.0",
+    redirect_slashes=False,  # Prevent 307 redirects that drop Authorization headers
 )
 
 # CORS middleware

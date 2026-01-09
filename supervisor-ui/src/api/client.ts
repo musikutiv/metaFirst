@@ -60,7 +60,7 @@ class ApiClient {
 
   // Projects
   async getProjects(): Promise<Project[]> {
-    return this.request<Project[]>('/projects');
+    return this.request<Project[]>('/projects/');
   }
 
   async getProject(projectId: number): Promise<Project> {
