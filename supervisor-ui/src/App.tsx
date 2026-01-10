@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { apiClient } from './api/client';
 import { Login } from './components/Login';
 import { Header } from './components/Header';
@@ -6,21 +7,23 @@ import { ProjectSelector } from './components/ProjectSelector';
 import { MetadataTable } from './components/MetadataTable';
 import { IngestInbox } from './components/IngestInbox';
 import { IngestForm } from './components/IngestForm';
+import { IngestPage } from './components/IngestPage';
 import { SampleDetailModal } from './components/SampleDetailModal';
 import type { User, Project, RDMP, Sample, RawDataItem, PendingIngest, StorageRoot } from './types';
 
-type View = 'metadata' | 'ingest-inbox' | 'ingest-form';
-
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // Auth state
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem('token')
   );
   const [user, setUser] = useState<User | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
 
-  // Navigation state
-  const [currentView, setCurrentView] = useState<View>('metadata');
+  // Navigation state (for non-routed views within project context)
   const [selectedPendingIngest, setSelectedPendingIngest] = useState<PendingIngest | null>(null);
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
 
@@ -50,12 +53,15 @@ function App() {
   useEffect(() => {
     if (token && !user) {
       loadUserAndProjects();
+    } else if (!token) {
+      setAuthChecking(false);
     }
   }, [token, user]);
 
   const loadUserAndProjects = async () => {
     try {
       setLoadingProjects(true);
+      setAuthChecking(true);
       const [userData, projectsData] = await Promise.all([
         apiClient.getCurrentUser(),
         apiClient.getProjects(),
@@ -69,6 +75,7 @@ function App() {
       setUser(null);
     } finally {
       setLoadingProjects(false);
+      setAuthChecking(false);
     }
   };
 
@@ -104,6 +111,7 @@ function App() {
       setLoginError(null);
       const { access_token } = await apiClient.login(username, password);
       setToken(access_token);
+      // After login, stay on the same route (deep link preserved)
     } catch {
       setLoginError('Invalid username or password');
     }
@@ -118,10 +126,10 @@ function App() {
     setSamples([]);
     setRawData([]);
     setStorageRoots([]);
-    setCurrentView('metadata');
     setSelectedPendingIngest(null);
     setSelectedSample(null);
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   const handleProjectSelect = useCallback((projectId: number) => {
     setSelectedProjectId(projectId);
@@ -130,19 +138,16 @@ function App() {
     setSamples([]);
     setRawData([]);
     setStorageRoots([]);
-    setCurrentView('metadata');
     setSelectedPendingIngest(null);
     setSelectedSample(null);
   }, []);
 
   const handleSelectPendingIngest = useCallback((ingest: PendingIngest) => {
     setSelectedPendingIngest(ingest);
-    setCurrentView('ingest-form');
   }, []);
 
   const handleIngestComplete = useCallback(() => {
     setSelectedPendingIngest(null);
-    setCurrentView('ingest-inbox');
     // Reload project data to get updated samples and raw data
     if (selectedProjectId) {
       loadProjectData(selectedProjectId);
@@ -151,18 +156,34 @@ function App() {
 
   const handleIngestCancel = useCallback(() => {
     setSelectedPendingIngest(null);
-    setCurrentView('ingest-inbox');
   }, []);
 
-  // Show login if not authenticated
+  // Callback for when IngestPage loads a project
+  const handleProjectLoadedFromIngest = useCallback((projectId: number) => {
+    if (projectId !== selectedProjectId) {
+      setSelectedProjectId(projectId);
+    }
+  }, [selectedProjectId]);
+
+  // Show loading while checking auth
+  if (authChecking) {
+    return (
+      <div style={styles.authLoading}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show login if not authenticated (preserving the current route for deep link)
   if (!token || !user) {
-    return <Login onLogin={handleLogin} error={loginError} />;
+    return <Login onLogin={handleLogin} error={loginError} returnPath={location.pathname} />;
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const fields = rdmp?.rdmp_json.fields || [];
 
-  const renderContent = () => {
+  // Render project-scoped content (metadata table or inbox)
+  const renderProjectContent = (view: 'metadata' | 'inbox') => {
     if (!selectedProject) {
       return (
         <div style={styles.placeholder}>
@@ -171,7 +192,8 @@ function App() {
       );
     }
 
-    if (currentView === 'ingest-form' && selectedPendingIngest) {
+    // If there's a selected pending ingest, show the form
+    if (selectedPendingIngest && view === 'inbox') {
       return (
         <IngestForm
           ingest={selectedPendingIngest}
@@ -184,7 +206,7 @@ function App() {
       );
     }
 
-    if (currentView === 'ingest-inbox') {
+    if (view === 'inbox') {
       return (
         <IngestInbox
           project={selectedProject}
@@ -207,59 +229,85 @@ function App() {
     );
   };
 
+  // Determine current tab from route
+  const currentTab = location.pathname === '/inbox' ? 'inbox' : 'metadata';
+
   return (
     <div style={styles.app}>
       <Header user={user} onLogout={handleLogout} />
 
       <main style={styles.main}>
-        <div style={styles.toolbar}>
-          <ProjectSelector
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onSelect={handleProjectSelect}
-            loading={loadingProjects}
+        <Routes>
+          {/* Direct ingest page - no project selection required */}
+          <Route
+            path="/ingest/:pendingId"
+            element={<IngestPage onProjectLoaded={handleProjectLoadedFromIngest} />}
           />
-        </div>
 
-        {selectedProject && (
-          <div style={styles.content}>
-            <div style={styles.projectInfo}>
-              <h2 style={styles.projectName}>{selectedProject.name}</h2>
-              {selectedProject.description && (
-                <p style={styles.projectDescription}>{selectedProject.description}</p>
-              )}
-              {rdmp && (
-                <p style={styles.rdmpInfo}>
-                  RDMP: {rdmp.rdmp_json.name} (v{rdmp.version_int})
-                </p>
-              )}
-            </div>
+          {/* Project-scoped views */}
+          <Route
+            path="/*"
+            element={
+              <>
+                <div style={styles.toolbar}>
+                  <ProjectSelector
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    onSelect={handleProjectSelect}
+                    loading={loadingProjects}
+                  />
+                </div>
 
-            {/* Navigation tabs */}
-            <div style={styles.tabs}>
-              <button
-                style={{
-                  ...styles.tab,
-                  ...(currentView === 'metadata' ? styles.tabActive : {}),
-                }}
-                onClick={() => setCurrentView('metadata')}
-              >
-                Metadata Table
-              </button>
-              <button
-                style={{
-                  ...styles.tab,
-                  ...(currentView === 'ingest-inbox' || currentView === 'ingest-form' ? styles.tabActive : {}),
-                }}
-                onClick={() => setCurrentView('ingest-inbox')}
-              >
-                Ingest Inbox
-              </button>
-            </div>
-          </div>
-        )}
+                {selectedProject && (
+                  <div style={styles.content}>
+                    <div style={styles.projectInfo}>
+                      <h2 style={styles.projectName}>{selectedProject.name}</h2>
+                      {selectedProject.description && (
+                        <p style={styles.projectDescription}>{selectedProject.description}</p>
+                      )}
+                      {rdmp && (
+                        <p style={styles.rdmpInfo}>
+                          RDMP: {rdmp.rdmp_json.name} (v{rdmp.version_int})
+                        </p>
+                      )}
+                    </div>
 
-        {renderContent()}
+                    {/* Navigation tabs */}
+                    <div style={styles.tabs}>
+                      <button
+                        style={{
+                          ...styles.tab,
+                          ...(currentTab === 'metadata' ? styles.tabActive : {}),
+                        }}
+                        onClick={() => navigate('/')}
+                      >
+                        Metadata Table
+                      </button>
+                      <button
+                        style={{
+                          ...styles.tab,
+                          ...(currentTab === 'inbox' ? styles.tabActive : {}),
+                        }}
+                        onClick={() => {
+                          setSelectedPendingIngest(null);
+                          navigate('/inbox');
+                        }}
+                      >
+                        Ingest Inbox
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <Routes>
+                  <Route path="/" element={renderProjectContent('metadata')} />
+                  <Route path="/inbox" element={renderProjectContent('inbox')} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </>
+            }
+          />
+        </Routes>
       </main>
 
       {/* Sample Detail Modal */}
@@ -281,6 +329,13 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
+  },
+  authLoading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
+    color: '#6b7280',
   },
   main: {
     flex: 1,

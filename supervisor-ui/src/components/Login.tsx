@@ -3,9 +3,10 @@ import { useState } from 'react';
 interface LoginProps {
   onLogin: (username: string, password: string) => Promise<void>;
   error: string | null;
+  returnPath?: string;
 }
 
-export function Login({ onLogin, error }: LoginProps) {
+export function Login({ onLogin, error, returnPath }: LoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,12 @@ export function Login({ onLogin, error }: LoginProps) {
         <p style={styles.hint}>
           Demo users: alice, bob, carol, david, eve (password: demo123)
         </p>
+
+        {returnPath && returnPath !== '/' && (
+          <p style={styles.returnInfo}>
+            After login, you will be redirected to: <code>{returnPath}</code>
+          </p>
+        )}
       </div>
     </div>
   );
@@ -120,5 +127,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: '#999',
     textAlign: 'center',
+  },
+  returnInfo: {
+    marginTop: '12px',
+    fontSize: '12px',
+    color: '#2563eb',
+    textAlign: 'center',
+    padding: '8px',
+    background: '#eff6ff',
+    borderRadius: '4px',
   },
 };

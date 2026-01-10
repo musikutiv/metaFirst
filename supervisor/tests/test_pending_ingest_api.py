@@ -416,3 +416,53 @@ class TestPendingIngestAPI:
 
         assert response.status_code == 400
         assert "already pending" in response.json()["detail"].lower()
+
+    def test_get_pending_ingest_includes_project_data_for_deep_link(
+        self, client, db, test_user, test_project, test_membership, test_storage_root, test_rdmp
+    ):
+        """
+        Regression test for deep linking: fetching a pending ingest by ID
+        must include project_id, project_name, and storage_root_name so the
+        UI can load project context without requiring prior project selection.
+        """
+        # Login
+        login_response = client.post(
+            "/api/auth/login",
+            data={"username": "testuser", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Create pending ingest with inferred sample identifier
+        create_response = client.post(
+            f"/api/projects/{test_project.id}/pending-ingests",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "storage_root_id": test_storage_root.id,
+                "relative_path": "data/deeplink-test.raw",
+                "inferred_sample_identifier": "DEEPLINK-001",
+                "file_size_bytes": 2048,
+            },
+        )
+        assert create_response.status_code == 201
+        pending_id = create_response.json()["id"]
+
+        # Fetch pending ingest by ID (simulates UI deep link to /ingest/{id})
+        response = client.get(
+            f"/api/pending-ingests/{pending_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify all data needed for deep linking is present
+        assert data["id"] == pending_id
+        assert data["project_id"] == test_project.id
+        assert data["storage_root_id"] == test_storage_root.id
+        assert data["relative_path"] == "data/deeplink-test.raw"
+        assert data["inferred_sample_identifier"] == "DEEPLINK-001"
+        assert data["file_size_bytes"] == 2048
+        assert data["status"] == "PENDING"
+        # These fields are populated by the API to help the UI
+        assert "project_name" in data
+        assert "storage_root_name" in data
