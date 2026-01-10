@@ -11,6 +11,8 @@ import sys
 import time
 import re
 import hashlib
+import platform
+import subprocess
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -293,18 +295,30 @@ class IngestEventHandler(FileSystemEventHandler):
                 file_size_bytes=file_size,
                 file_hash_sha256=file_hash,
             )
-            print(f"  [OK] Created pending ingest (ID: {pending_ingest['id']})")
-            print(f"       Complete metadata entry in browser at:")
-            ingest_url = f"{self.ui_base_url}/ingest/{pending_ingest['id']}"
-            print(f"       {ingest_url}")
+            ingest_id = pending_ingest["id"]
+            print(f"  Created pending ingest: {ingest_id}")
+
+            # Construct ingest URL (rstrip to avoid double slashes)
+            ingest_url = f"{self.ui_base_url.rstrip('/')}/ingest/{ingest_id}"
+            print(f"  Complete metadata entry in browser at: {ingest_url}")
 
             # Optionally open browser
             if self.open_browser:
-                webbrowser.open(ingest_url)
-                print(f"  [BROWSER] Opened ingest page")
+                print(f"  Opening browser: {ingest_url}")
+                self._open_browser(ingest_url)
 
         except Exception as e:
             print(f"  [ERROR] Failed to create pending ingest: {e}")
+
+    def _open_browser(self, url: str):
+        """Open URL in browser, using subprocess on macOS with webbrowser fallback."""
+        if platform.system() == "Darwin":
+            try:
+                subprocess.run(["open", url], check=True)
+                return
+            except subprocess.CalledProcessError as e:
+                print(f"  [WARN] subprocess open failed: {e}, falling back to webbrowser")
+        webbrowser.open(url)
 
 
 def load_config(config_path: str) -> dict:

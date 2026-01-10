@@ -144,10 +144,11 @@ The user ingestion helper watches configured folders on user machines and automa
 
    ```yaml
    supervisor_url: http://localhost:8000
+   ui_url: http://localhost:5173
    username: alice
    password: demo123
-   max_field_prompts: 3
    compute_hash: false
+   open_browser: true  # Auto-open browser when file detected
    watchers:
      - watch_path: /Users/alice/data/qpcr
        project_id: 1
@@ -160,6 +161,26 @@ The user ingestion helper watches configured folders on user machines and automa
    ```bash
    python metafirst_ingest.py config.yaml
    ```
+
+### Browser-Based Metadata Entry
+
+When the ingest helper detects a new file, it creates a **pending ingest** in the supervisor
+and optionally opens your browser to the ingest form. The output shows:
+
+```
+[NEW FILE] /Users/alice/data/qpcr/QPCR-001_results.csv
+  Relative path: qpcr/QPCR-001_results.csv
+  Inferred sample identifier: QPCR-001
+  Created pending ingest: 1
+  Complete metadata entry in browser at: http://localhost:5173/ingest/1
+  Opening browser: http://localhost:5173/ingest/1
+```
+
+**Manual Testing:**
+1. Start the supervisor and UI
+2. Run the ingest helper with `open_browser: true` in config
+3. Drop a file into the watched folder
+4. Verify the browser opens to `/ingest/{id}` with the correct pending ingest form
 
 ### Demo: Watch a Folder and Ingest Files
 
@@ -196,12 +217,15 @@ The user ingestion helper watches configured folders on user machines and automa
 7. **Observe the ingest helper**:
    - It will detect the new file
    - Extract sample identifier (e.g., `QPCR-001` from the filename)
-   - Prompt you to confirm or change the identifier
-   - Create/find the sample in the project
-   - Register the raw data reference
-   - Optionally prompt for required RDMP fields
+   - Create a pending ingest in the supervisor
+   - Open browser to the ingest form (if `open_browser: true`)
 
-8. **Verify in supervisor**:
+8. **Complete metadata entry in browser**:
+   - Select or create the sample
+   - Fill in required RDMP fields
+   - Submit to finalize the ingest
+
+9. **Verify in supervisor**:
    ```bash
    # List raw data items
    curl -X GET "http://localhost:8000/api/projects/1/raw-data" \
