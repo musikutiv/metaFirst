@@ -31,9 +31,10 @@ This system implements a **metadata-first** approach where:
    - RDMP-driven dynamic columns
    - Project selection and completeness indicators
 
-4. **Federated Discovery Index** (FastAPI + SQLite) - *Planned*
-   - Separate service for cross-project search
-   - Respects RDMP visibility policies
+4. **Federated Discovery Index** (FastAPI + SQLite) - *API Implemented*
+   - Cross-project metadata search via HTTP API
+   - Respects RDMP-derived visibility policies (PUBLIC, REGISTERED, PRIVATE)
+   - No web UI yet (see below)
 
 ## Quick Start
 
@@ -262,6 +263,76 @@ and optionally opens your browser to the ingest form. The output shows:
 | PUT | `/raw-data/{id}/path` | Update path (audited) |
 | GET | `/raw-data/{id}/path-history` | Get path change history |
 
+## Federated Discovery Index (Current Status)
+
+A metadata-only discovery index is implemented, enabling cross-project search via HTTP API. The index stores sample metadata with visibility enforcement based on RDMP-derived policies. Raw data files are never indexed or accessed by the discovery system.
+
+### What Is Available
+
+- **Push API**: Authenticated endpoint to index sample metadata from supervisor instances
+- **Search API**: Query indexed samples with visibility filtering
+- **Record detail API**: Retrieve full metadata for individual indexed records
+
+### What Is NOT Available Yet
+
+- **No browser-based search UI**: Discovery is currently API-driven only
+
+At this stage, discovery is intentionally exposed via API only. A web UI is trivial to add, but is deferred until discovery scope and visibility semantics are fully validated.
+
+### API Usage
+
+**Search public samples:**
+```bash
+curl -s "http://localhost:8000/api/discovery/search?q=QPCR&visibility=PUBLIC"
+```
+
+**Search with authentication (for REGISTERED/PRIVATE visibility):**
+```bash
+curl -s "http://localhost:8000/api/discovery/search?q=sample&visibility=REGISTERED" \
+  -H "Authorization: ApiKey YOUR_DISCOVERY_API_KEY"
+```
+
+**Parameters:**
+- `q`: Search query (substring match against indexed text)
+- `visibility`: Comma-separated list of visibility levels (PUBLIC, REGISTERED, PRIVATE)
+- `from`: Pagination offset (default: 0)
+- `size`: Results per page (default: 20, max: 100)
+
+**Push samples to index (requires API key):**
+```bash
+export DISCOVERY_API_KEY=your-secret-key
+
+curl -X POST "http://localhost:8000/api/discovery/push" \
+  -H "Authorization: ApiKey $DISCOVERY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin": "supervisor-a.example.com",
+    "records": [
+      {
+        "origin_project_id": 1,
+        "origin_sample_id": 100,
+        "sample_identifier": "QPCR-001",
+        "visibility": "PUBLIC",
+        "metadata": {"organism": "Homo sapiens", "tissue": "blood"}
+      }
+    ]
+  }'
+```
+
+A CLI helper is also available: `python tools/discovery_push.py --project-id 1 --visibility PUBLIC`
+
+### Design Rationale
+
+- **Validate semantics before UX**: Ensure discovery scope and visibility rules are correct before committing to a UI
+- **Avoid freezing assumptions**: Global visibility policies may evolve; API-only allows iteration without UI rework
+- **Keep discovery loosely coupled**: The index is a separate SQLite database (`discovery.db`), making it easy to extract to a standalone service later
+
+### Planned Next Steps
+
+- Minimal web-based search page
+- Deep links back to originating supervisor instances
+- No backend architecture changes required
+
 ## Demo Data Structure
 
 ### Users (all password: `demo123`)
@@ -458,8 +529,10 @@ metaFirst/
 │   │   ├── models/            # SQLAlchemy ORM models
 │   │   ├── schemas/           # Pydantic request/response models
 │   │   ├── api/               # FastAPI route handlers
+│   │   ├── discovery/         # Federated discovery index module
 │   │   ├── services/          # Business logic (RDMP, permissions, audit)
 │   │   └── utils/             # Security, validation utilities
+│   ├── tools/                 # CLI utilities (discovery_push.py)
 │   ├── tests/                 # Test suite
 │   ├── alembic/               # Database migrations
 │   └── pyproject.toml         # Dependencies
@@ -506,7 +579,7 @@ metaFirst/
 
 - [ ] Release management (freeze snapshots)
 - [ ] Release corrections (linked new releases)
-- [ ] Federated discovery index
+- [ ] Discovery web UI (search page with deep links)
 
 ### ✅ Recently Implemented
 
@@ -516,6 +589,7 @@ metaFirst/
 - [x] Audit logging service
 - [x] User ingestion helper (watchdog-based file watcher)
 - [x] Read-only metadata table UI (React + Vite)
+- [x] Federated discovery index (API-only, no web UI yet)
 
 ## API Endpoints
 
