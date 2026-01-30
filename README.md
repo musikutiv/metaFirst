@@ -45,7 +45,7 @@ After installation, start the services:
 ```bash
 # Supervisor backend (terminal 1)
 cd supervisor && source venv/bin/activate
-uvicorn supervisor.main:app --reload --port 8000
+uvicorn supervisor.main:app --reload --host 0.0.0.0 --port 8000
 
 # Web UI (terminal 2)
 cd supervisor-ui && npm install && npm run dev
@@ -54,6 +54,8 @@ cd supervisor-ui && npm install && npm run dev
 cd ingest_helper && source venv/bin/activate
 python metafirst_ingest.py config.yaml
 ```
+
+The `--host 0.0.0.0` flag allows access from other machines (required for ingest helpers on user laptops). Use `--host 127.0.0.1` for local-only access.
 
 - API docs: http://localhost:8000/docs
 - Web UI: http://localhost:5173
@@ -68,10 +70,9 @@ The install scripts require Python 3.11+. If your system Python is older:
 - Override: `PYTHON_BIN=/path/to/python3.12 ./scripts/install_supervisor.sh`
 
 **Cannot reach supervisor from another machine**
-By default uvicorn binds to localhost only. To allow external connections:
-```bash
-uvicorn supervisor.main:app --reload --host 0.0.0.0 --port 8000
-```
+If login works on the supervisor host but not from another machine, check:
+- uvicorn is started with `--host 0.0.0.0` (not `127.0.0.1` or omitted)
+- Firewall allows incoming connections on port 8000
 
 **Ingest helper 404 on /api/projects**
 Fixed in latest version. Pull the latest code and reinstall:

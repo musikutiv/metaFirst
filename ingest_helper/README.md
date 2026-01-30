@@ -43,6 +43,8 @@ watchers:
     storage_root_id: 1
 ```
 
+**Note:** The supervisor must be started with `--host 0.0.0.0` for ingest helpers running on other machines to connect.
+
 ### Watcher Configuration Options
 
 Each watcher entry supports:

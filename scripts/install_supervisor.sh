@@ -328,10 +328,23 @@ echo ""
 echo "To start the backend API:"
 echo "  cd $REPO_ROOT/supervisor"
 echo "  source venv/bin/activate"
-echo "  uvicorn supervisor.main:app --reload --port 8000"
+echo ""
+echo "  Local-only (same machine):"
+echo "    uvicorn supervisor.main:app --reload --host 127.0.0.1 --port 8000"
+echo ""
+echo "  Network-accessible (other machines can connect):"
+echo "    uvicorn supervisor.main:app --reload --host 0.0.0.0 --port 8000"
+echo ""
+echo "  Use --host 0.0.0.0 if clients or ingest helpers run on other machines."
 echo ""
 echo "API will be available at: http://localhost:8000"
 echo "API docs at: http://localhost:8000/docs"
+
+# Firewall reminder for macOS/Linux
+if [[ "$(uname)" == "Darwin" ]] || [[ "$(uname)" == "Linux" ]]; then
+    echo ""
+    echo "Note: You may need to allow incoming connections on port 8000 in your firewall."
+fi
 
 if [[ "$NODE_AVAILABLE" == "true" ]]; then
     echo ""
