@@ -26,7 +26,7 @@ Install scripts automate setup on macOS/Linux. Run from the repository root.
 
 Sets up Python venv, installs dependencies, and seeds demo data if the database is missing. The database is created at `supervisor/supervisor.db`. Prints commands to start the backend API and web UI.
 
-Requirements: Python 3.11+, Node.js 18+ (for web UI)
+Requirements: Python 3.11+. Node.js 18+ is required only for the web UI (backend works without it).
 
 ### User (researcher / data steward)
 
@@ -97,44 +97,16 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
   http://localhost:8000/api/projects/1/storage-roots/
 ```
 
-## Common Issues
+## Common Pitfalls
 
-**Python too old**
-The install scripts require Python 3.11+. If your system Python is older:
-- Homebrew (macOS): `brew install python@3.12`
-- Conda: `conda create -n metafirst python=3.12 && conda activate metafirst`
-- Override: `PYTHON_BIN=/path/to/python3.12 ./scripts/install_supervisor.sh`
-
-**Cannot reach supervisor from another machine**
-If login works on the supervisor host but not from another machine, check:
-- uvicorn is started with `--host 0.0.0.0` (not `127.0.0.1` or omitted)
-- Firewall allows incoming connections on port 8000
-
-**Ingest helper 404 on /api/projects**
-Fixed in latest version. Pull the latest code and reinstall:
-```bash
-git pull && ./scripts/install_user.sh
-```
-
-**Login fails with 401 after installation**
-The database lives at `supervisor/supervisor.db`. If login fails:
-1. Check the DB exists: `ls -la supervisor/supervisor.db`
-2. Verify users were seeded: run `./scripts/install_supervisor.sh --seed`
-3. Start uvicorn from the `supervisor/` directory (the default)
-
-To use a different database location, set `DATABASE_URL`:
-```bash
-DATABASE_URL=sqlite:///path/to/my.db uvicorn supervisor.main:app --reload --port 8000
-```
-
-**Re-seeding demo data**
-Running `./scripts/install_supervisor.sh --seed` on an existing database will **delete and recreate** the database. This is a destructive reset that removes all local data. Stop uvicorn before reseeding.
-
-**Multiple database files / wrong database used**
-Older versions used a relative path that created `supervisor.db` in whichever directory you ran uvicorn from. The current version uses an absolute path to `supervisor/supervisor.db` regardless of working directory. If you have a stale `./supervisor.db` in the repo root, delete it:
-```bash
-rm -f ./supervisor.db  # Remove stale DB at repo root (if any)
-```
+- **Python too old** — Install scripts require Python 3.11+. Use `PYTHON_BIN=/path/to/python3.12` to override.
+- **Supervisor not reachable** — Start uvicorn with `--host 0.0.0.0` for remote access; check firewall on port 8000.
+- **Web UI "host not allowed"** — Set `VITE_ALLOWED_HOSTS` to the hostname clients use, or use `./scripts/start_ui_remote.sh`.
+- **Login fails (401)** — Check DB exists at `supervisor/supervisor.db`; run `./scripts/install_supervisor.sh --seed` to reseed.
+- **Multiple DB files** — The canonical DB is `supervisor/supervisor.db`. Delete any stale `./supervisor.db` in repo root.
+- **Storage root not found** — Storage roots are per-project. Demo seeding creates `LOCAL_DATA`; for real projects, create via API.
+- **Re-seeding is destructive** — Running `--seed` on existing DB deletes and recreates it. Stop uvicorn first.
+- **Discovery push fails** — Set `DISCOVERY_API_KEY` env var before pushing to the discovery index.
 
 ## Documentation
 

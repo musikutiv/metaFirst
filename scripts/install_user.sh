@@ -222,7 +222,10 @@ if [[ "$CONFIG_CREATED" == "true" ]]; then
     echo "  - supervisor_url: URL of your supervisor instance"
     echo "  - ui_url: URL of the web UI"
     echo "  - username/password: Your credentials"
-    echo "  - watchers: Folders to watch and their project/storage root mappings"
+    echo "  - watchers: Folders to watch with project_name + storage_root_name"
+    echo ""
+    echo "Use name-based config (project_name, storage_root_name) for portability."
+    echo "Demo projects include storage root 'LOCAL_DATA' by default."
     echo ""
     echo "See ingest_helper/README.md for configuration details."
 fi
