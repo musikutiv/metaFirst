@@ -14,51 +14,50 @@ A metadata-first Research Data Management system for life sciences. Metadata is 
 
 Active proof-of-principle. Core functionality is implemented; some features (releases, discovery UI) are planned.
 
-## Quick Start
+## Installation
+
+Install scripts automate setup on macOS/Linux. Run from the repository root.
 
 ### Supervisor (group leader / lab admin)
 
 ```bash
-# Clone and set up
-git clone <repository-url>
-cd metaFirst/supervisor
+./scripts/install_supervisor.sh
+```
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+Sets up Python venv, installs dependencies, and seeds demo data if the database is missing. Prints commands to start the backend API and web UI.
 
-# Install dependencies
-pip install -e ".[dev]"
+Requirements: Python 3.11+, Node.js 18+ (for web UI)
 
-# Seed demo data
-python ../demo/seed.py
+### User (researcher / data steward)
 
-# Start backend API
+```bash
+./scripts/install_user.sh
+```
+
+Sets up Python venv for the ingest helper and creates `config.yaml` from the example if missing. Edit `config.yaml` with your supervisor URL, credentials, and watch paths before running.
+
+The ingest helper is optional. Raw data stays on your machine.
+
+## Quick Start
+
+After installation, start the services:
+
+```bash
+# Supervisor backend (terminal 1)
+cd supervisor && source venv/bin/activate
 uvicorn supervisor.main:app --reload --port 8000
 
-# Start web UI (in a new terminal)
-cd ../supervisor-ui
-npm install
-npm run dev
+# Web UI (terminal 2)
+cd supervisor-ui && npm install && npm run dev
+
+# Ingest helper (terminal 3, on user machine)
+cd ingest_helper && source venv/bin/activate
+python metafirst_ingest.py config.yaml
 ```
 
 - API docs: http://localhost:8000/docs
 - Web UI: http://localhost:5173
 - Demo users: alice, bob, carol, david, eve (password: `demo123`)
-
-### User (researcher / data steward)
-
-The ingest helper is optional. It watches local folders and creates pending ingests when new files appear. Raw data stays on your machine.
-
-```bash
-cd ingest_helper
-pip install -r requirements.txt
-cp config.example.yaml config.yaml
-# Edit config.yaml with your supervisor URL, credentials, and watch paths
-python metafirst_ingest.py config.yaml
-```
-
-See [ingest_helper/README.md](ingest_helper/README.md) for configuration details.
 
 ## Documentation
 
