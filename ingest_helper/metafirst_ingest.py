@@ -34,12 +34,34 @@ logger = logging.getLogger(__name__)
 class SupervisorClient:
     """Client for interacting with the metaFirst Supervisor API."""
 
+    # Endpoints that require trailing slash (router root paths)
+    # These are mounted with prefix and have @router.get("/") or @router.post("/")
+    _TRAILING_SLASH_ENDPOINTS = frozenset([
+        "/api/projects",
+        "/api/rdmp/templates",
+    ])
+
     def __init__(self, base_url: str, username: str, password: str):
         self.base_url = base_url.rstrip("/")
         self.username = username
         self.password = password
         self._token: str | None = None
         self._client = httpx.Client(timeout=30.0)
+
+    def _normalize_endpoint(self, endpoint: str) -> str:
+        """Normalize endpoint path to match supervisor's canonical routes.
+
+        The supervisor has redirect_slashes=False, so we must use exact paths.
+        Router root endpoints (e.g., /api/projects) need trailing slashes.
+        """
+        # Strip any existing trailing slash for comparison
+        normalized = endpoint.rstrip("/")
+
+        # Add trailing slash for known router root endpoints
+        if normalized in self._TRAILING_SLASH_ENDPOINTS:
+            return normalized + "/"
+
+        return endpoint
 
     def _get_token(self) -> str:
         """Get or refresh JWT token."""
@@ -75,6 +97,9 @@ class SupervisorClient:
             retries: Number of retries for 5xx errors (default 0)
             retry_delay: Initial delay between retries in seconds (exponential backoff)
         """
+        # Normalize endpoint to match supervisor's canonical routes
+        endpoint = self._normalize_endpoint(endpoint)
+
         headers = {"Authorization": f"Bearer {self._get_token()}"}
 
         attempt = 0

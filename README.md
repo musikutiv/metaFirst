@@ -59,6 +59,26 @@ python metafirst_ingest.py config.yaml
 - Web UI: http://localhost:5173
 - Demo users: alice, bob, carol, david, eve (password: `demo123`)
 
+## Common Issues
+
+**Python too old**
+The install scripts require Python 3.11+. If your system Python is older:
+- Homebrew (macOS): `brew install python@3.12`
+- Conda: `conda create -n metafirst python=3.12 && conda activate metafirst`
+- Override: `PYTHON_BIN=/path/to/python3.12 ./scripts/install_supervisor.sh`
+
+**Cannot reach supervisor from another machine**
+By default uvicorn binds to localhost only. To allow external connections:
+```bash
+uvicorn supervisor.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Ingest helper 404 on /api/projects**
+Fixed in latest version. Pull the latest code and reinstall:
+```bash
+git pull && ./scripts/install_user.sh
+```
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design, components, interaction flows

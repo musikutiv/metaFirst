@@ -10,6 +10,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Defaults
+NON_INTERACTIVE=false
+MIN_PYTHON_VERSION="3.11"
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
@@ -19,6 +23,9 @@ Sets up the metaFirst ingest helper for local file watching and metadata entry.
 Options:
   --non-interactive  Skip all prompts (use defaults)
   -h, --help         Show this help message
+
+Environment variables:
+  PYTHON_BIN         Path to Python binary (default: auto-detect python3.13/3.12/3.11/python3)
 
 Run from the repository root:
   ./scripts/install_user.sh
@@ -30,6 +37,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case $1 in
         --non-interactive)
+            NON_INTERACTIVE=true
             shift
             ;;
         -h|--help)
@@ -55,30 +63,118 @@ fi
 
 cd "$REPO_ROOT"
 
-# Check Python 3
-if ! command -v python3 &> /dev/null; then
-    echo "ERROR: python3 not found. Please install Python 3.11 or later."
-    exit 1
-fi
+# -----------------------------------------------------------------------------
+# Python detection and version check
+# -----------------------------------------------------------------------------
 
-PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-echo "Found Python $PYTHON_VERSION"
+find_python() {
+    # If PYTHON_BIN is set, use it
+    if [[ -n "${PYTHON_BIN:-}" ]]; then
+        if [[ -x "$PYTHON_BIN" ]]; then
+            echo "$PYTHON_BIN"
+            return 0
+        else
+            echo "ERROR: PYTHON_BIN=$PYTHON_BIN is not executable" >&2
+            exit 1
+        fi
+    fi
+
+    # Try specific versions first (prefer newer)
+    for py in python3.13 python3.12 python3.11 python3; do
+        if command -v "$py" &> /dev/null; then
+            echo "$py"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+check_python_version() {
+    local python_bin="$1"
+    local version
+    version=$("$python_bin" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+    local major minor
+    major=$(echo "$version" | cut -d. -f1)
+    minor=$(echo "$version" | cut -d. -f2)
+
+    local min_major min_minor
+    min_major=$(echo "$MIN_PYTHON_VERSION" | cut -d. -f1)
+    min_minor=$(echo "$MIN_PYTHON_VERSION" | cut -d. -f2)
+
+    if [[ "$major" -lt "$min_major" ]] || { [[ "$major" -eq "$min_major" ]] && [[ "$minor" -lt "$min_minor" ]]; }; then
+        echo ""
+        echo "ERROR: Python $version is too old. Requires Python >= $MIN_PYTHON_VERSION"
+        echo ""
+        echo "Solutions:"
+        echo "  macOS (Homebrew):  brew install python@3.12"
+        echo "  Conda:             conda create -n metafirst python=3.12 && conda activate metafirst"
+        echo "  Override:          PYTHON_BIN=/path/to/python3.12 $0"
+        echo ""
+        exit 1
+    fi
+
+    echo "$version"
+}
+
+PYTHON_BIN=$(find_python) || {
+    echo "ERROR: python3 not found. Please install Python $MIN_PYTHON_VERSION or later."
+    echo ""
+    echo "Solutions:"
+    echo "  macOS (Homebrew):  brew install python@3.12"
+    echo "  Conda:             conda create -n metafirst python=3.12 && conda activate metafirst"
+    exit 1
+}
+
+PYTHON_VERSION=$(check_python_version "$PYTHON_BIN")
+echo "Using Python $PYTHON_VERSION ($PYTHON_BIN)"
 
 echo ""
 echo "Setting up ingest helper..."
 echo "----------------------------------------------"
 
-# Create venv if missing (separate from supervisor for cleaner user setup)
+# -----------------------------------------------------------------------------
+# Virtual environment setup with broken venv detection
+# -----------------------------------------------------------------------------
+
 VENV_DIR="$REPO_ROOT/ingest_helper/venv"
-if [[ ! -d "$VENV_DIR" ]]; then
-    echo "Creating virtual environment at ingest_helper/venv..."
-    python3 -m venv "$VENV_DIR"
-else
-    echo "Virtual environment already exists at ingest_helper/venv"
-fi
+
+setup_venv() {
+    if [[ -d "$VENV_DIR" ]]; then
+        echo "Virtual environment exists at ingest_helper/venv"
+
+        # Check if venv is broken (pip missing or not working)
+        if ! "$VENV_DIR/bin/python" -m pip --version &> /dev/null; then
+            echo "WARNING: Virtual environment appears broken (pip not working)"
+
+            # Try to fix with ensurepip
+            echo "Attempting to fix with ensurepip..."
+            if "$VENV_DIR/bin/python" -m ensurepip --upgrade &> /dev/null; then
+                echo "Fixed: ensurepip succeeded"
+            else
+                echo "Recreating virtual environment..."
+                rm -rf "$VENV_DIR"
+                "$PYTHON_BIN" -m venv "$VENV_DIR"
+            fi
+        fi
+    else
+        echo "Creating virtual environment at ingest_helper/venv..."
+        "$PYTHON_BIN" -m venv "$VENV_DIR"
+    fi
+}
+
+setup_venv
 
 # Activate venv
 source "$VENV_DIR/bin/activate"
+
+# Verify pip works
+if ! python -m pip --version &> /dev/null; then
+    echo "ERROR: pip is not working in the virtual environment."
+    echo "Try deleting ingest_helper/venv and running this script again."
+    exit 1
+fi
 
 # Install dependencies
 echo "Installing Python dependencies..."
@@ -99,6 +195,7 @@ echo "watchdog module OK."
 # Create config.yaml if missing
 CONFIG_FILE="$REPO_ROOT/ingest_helper/config.yaml"
 CONFIG_EXAMPLE="$REPO_ROOT/ingest_helper/config.example.yaml"
+CONFIG_CREATED=false
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
     if [[ -f "$CONFIG_EXAMPLE" ]]; then
@@ -109,11 +206,9 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
         CONFIG_CREATED=true
     else
         echo "WARNING: config.example.yaml not found. Create config.yaml manually."
-        CONFIG_CREATED=false
     fi
 else
     echo "config.yaml already exists."
-    CONFIG_CREATED=false
 fi
 
 echo ""
@@ -121,7 +216,7 @@ echo "=============================================="
 echo "Ingest helper installation complete!"
 echo "=============================================="
 
-if [[ "${CONFIG_CREATED:-false}" == "true" ]]; then
+if [[ "$CONFIG_CREATED" == "true" ]]; then
     echo ""
     echo "IMPORTANT: Edit ingest_helper/config.yaml before running:"
     echo "  - supervisor_url: URL of your supervisor instance"
