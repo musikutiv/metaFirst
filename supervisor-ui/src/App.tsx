@@ -241,7 +241,12 @@ function App() {
           {/* Direct ingest page - no project selection required */}
           <Route
             path="/ingest/:pendingId"
-            element={<IngestPage onProjectLoaded={handleProjectLoadedFromIngest} />}
+            element={
+              <IngestPage
+                onProjectLoaded={handleProjectLoadedFromIngest}
+                onIngestComplete={handleIngestComplete}
+              />
+            }
           />
 
           {/* Project-scoped views */}

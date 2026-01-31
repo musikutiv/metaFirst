@@ -2,6 +2,8 @@
 
 A metadata-first Research Data Management system for life sciences. Metadata is collected centrally via RDMP-guided forms; raw data remains on user machines and lab storage.
 
+Licensed under the [MIT License](LICENSE).
+
 ## Core Ideas
 
 - **Metadata-first, sample-centric** — samples are the unit of organization; metadata is captured before or during data acquisition

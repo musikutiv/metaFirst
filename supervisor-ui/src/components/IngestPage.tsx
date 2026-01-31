@@ -5,9 +5,10 @@ import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP } from '../typ
 
 interface IngestPageProps {
   onProjectLoaded?: (projectId: number) => void;
+  onIngestComplete?: () => void;
 }
 
-export function IngestPage({ onProjectLoaded }: IngestPageProps) {
+export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProps) {
   const { pendingId } = useParams<{ pendingId: string }>();
   const navigate = useNavigate();
 
@@ -118,7 +119,11 @@ export function IngestPage({ onProjectLoaded }: IngestPageProps) {
       }
 
       await apiClient.finalizePendingIngest(ingest.id, finalizeData);
-      navigate('/inbox');
+      // Trigger project data reload before navigating
+      if (onIngestComplete) {
+        onIngestComplete();
+      }
+      navigate('/');
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to finalize ingest');
     } finally {
