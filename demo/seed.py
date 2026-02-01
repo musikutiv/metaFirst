@@ -18,8 +18,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "supervisor"))
 from sqlalchemy.orm import Session
 from supervisor.database import SessionLocal, engine, Base
 from supervisor.models.user import User
+from supervisor.models.supervisor import Supervisor
 from supervisor.models.project import Project
 from supervisor.models.membership import Membership
+from supervisor.models.supervisor_membership import SupervisorMembership, SupervisorRole
 from supervisor.models.rdmp import RDMPTemplate, RDMPTemplateVersion, RDMPVersion
 from supervisor.models.sample import Sample, SampleFieldValue
 from supervisor.models.storage import StorageRoot
@@ -94,6 +96,72 @@ def seed_database():
 
         db.flush()
 
+        print("\n=== Creating Supervisor ===")
+        # Create a default supervisor for all demo projects
+        # Operational DB uses SQLite in the supervisor directory
+        supervisor_db_path = Path(__file__).parent.parent / "supervisor" / "demo_lab_ops.db"
+        supervisor_db_dsn = f"sqlite:///{supervisor_db_path}"
+        supervisor = Supervisor(
+            name="Demo Lab",
+            description="Default supervisor for demo projects",
+            supervisor_db_dsn=supervisor_db_dsn,
+        )
+        db.add(supervisor)
+        db.flush()
+        print(f"  Created supervisor: {supervisor.name}")
+
+        print("\n=== Creating Supervisor Memberships ===")
+        # Alice: PI (primary steward authority)
+        db.add(SupervisorMembership(
+            supervisor_id=supervisor.id,
+            user_id=users[0].id,  # Alice
+            role=SupervisorRole.PI,
+            created_by=users[0].id,
+        ))
+        print("  Alice → PI")
+
+        # Eve: STEWARD (operational responsibility)
+        db.add(SupervisorMembership(
+            supervisor_id=supervisor.id,
+            user_id=users[4].id,  # Eve
+            role=SupervisorRole.STEWARD,
+            created_by=users[0].id,
+        ))
+        print("  Eve → STEWARD")
+
+        # Carol: STEWARD (also a steward, cross-project responsibilities)
+        db.add(SupervisorMembership(
+            supervisor_id=supervisor.id,
+            user_id=users[2].id,  # Carol
+            role=SupervisorRole.STEWARD,
+            created_by=users[0].id,
+        ))
+        print("  Carol → STEWARD")
+
+        # Bob: RESEARCHER
+        db.add(SupervisorMembership(
+            supervisor_id=supervisor.id,
+            user_id=users[1].id,  # Bob
+            role=SupervisorRole.RESEARCHER,
+            created_by=users[0].id,
+        ))
+        print("  Bob → RESEARCHER")
+
+        # David: RESEARCHER
+        db.add(SupervisorMembership(
+            supervisor_id=supervisor.id,
+            user_id=users[3].id,  # David
+            role=SupervisorRole.RESEARCHER,
+            created_by=users[0].id,
+        ))
+        print("  David → RESEARCHER")
+
+        db.flush()
+
+        # Set Alice as primary steward
+        supervisor.primary_steward_user_id = users[0].id
+        print(f"  Primary steward set to: Alice")
+
         print("\n=== Creating Projects ===")
 
         # Project 1: Gene Expression Study (qPCR) - Alice PI, Bob and Carol researchers
@@ -102,6 +170,7 @@ def seed_database():
             name="Gene Expression Study 2024",
             description="qPCR analysis of gene expression in cancer cell lines",
             created_by=users[0].id,  # Alice
+            supervisor_id=supervisor.id,
         )
         db.add(project1)
         db.flush()
@@ -141,6 +210,7 @@ def seed_database():
             name="Transcriptomics Analysis",
             description="RNA-seq of cancer cell lines under different treatments",
             created_by=users[2].id,  # Carol
+            supervisor_id=supervisor.id,
         )
         db.add(project2)
         db.flush()
@@ -180,6 +250,7 @@ def seed_database():
             name="Cellular Imaging Core",
             description="Microscopy facility data management",
             created_by=users[4].id,  # Eve
+            supervisor_id=supervisor.id,
         )
         db.add(project3)
         db.flush()
@@ -340,6 +411,12 @@ def seed_database():
 
         db.commit()
 
+        # Initialize operational database for the supervisor
+        print("\n=== Initializing Operational Database ===")
+        from supervisor.operational import init_operational_db
+        init_operational_db(supervisor_db_dsn)
+        print(f"  Initialized: {supervisor_db_dsn}")
+
         print("\n" + "=" * 50)
         print("✓ Demo data seeded successfully!")
         print("=" * 50)
@@ -347,12 +424,18 @@ def seed_database():
         print("\n=== Summary ===")
         print(f"Users: {len(users_data)}")
         print(f"  - alice, bob, carol, david, eve (all with password: demo123)")
+        print(f"\nSupervisors: 1")
+        print(f"  - Demo Lab (owns all demo projects)")
+        print(f"  - Operational DB: {supervisor_db_dsn}")
+        print(f"  - Primary steward: Alice (PI)")
+        print(f"  - Memberships:")
+        print(f"      Alice (PI), Carol (STEWARD), Eve (STEWARD), Bob (RESEARCHER), David (RESEARCHER)")
         print(f"\nRDMP Templates: {len(template_files)}")
         print(f"  - qPCR Standard")
         print(f"  - RNA-seq Standard")
         print(f"  - Microscopy Standard")
         print(f"  - Clinical Samples")
-        print(f"\nProjects: 3 (each with storage root: LOCAL_DATA)")
+        print(f"\nProjects: 3 (each with storage root: LOCAL_DATA, owned by Demo Lab supervisor)")
         print(f"  - Gene Expression Study 2024 (qPCR)")
         print(f"  - Transcriptomics Analysis (RNA-seq)")
         print(f"  - Cellular Imaging Core (Microscopy)")

@@ -55,6 +55,8 @@ Raw data files reside on user machines (workstations, lab servers, NAS). The sys
 
 The ingest helper is a convenience tool, not a required component. Users can also register files via direct API calls.
 
+**Supervisor Scoping (v0.2+)**: Each ingestor instance is bound to exactly one supervisor. Projects from other supervisors are rejected at ingest time. To ingest for multiple supervisors, run separate ingestor instances with different configs.
+
 ### Storage Roots
 
 A **storage root** is a named reference to a storage location (e.g., "Lab NAS", "Local SSD"). Each user maps storage roots to their local mount paths.
@@ -168,6 +170,113 @@ All functionality is exposed via REST APIs:
 |--------|---------|
 | IndexedSample | Metadata record in the discovery index |
 
+### Operational Entities (v0.2+)
+
+| Entity | Purpose | Database |
+|--------|---------|----------|
+| Supervisor | Tenant/organization unit | Central |
+| SupervisorMembership | Links users to supervisors with roles | Central |
+| IngestRun | Record of ingest operations | Per-supervisor |
+| Heartbeat | Ingestor health status | Per-supervisor |
+
+## Authorization (v0.2+)
+
+metaFirst uses a two-level authorization model:
+
+### Supervisor-Level Roles
+
+Users are assigned one of three roles per supervisor via `SupervisorMembership`:
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **PI** | Principal Investigator | Full authority. Can update supervisor config, create projects, trigger ingest runs, assign primary steward, manage all roles. |
+| **STEWARD** | Data Steward | Operational responsibility. Can update supervisor config, create projects, trigger ingest runs, manage operational state. |
+| **RESEARCHER** | Researcher | Can trigger ingest runs, access supervisor resources. Cannot create projects or modify supervisor config. |
+
+Each supervisor has exactly one **primary steward** (`primary_steward_user_id`), typically assigned the PI role. The primary steward has ultimate responsibility for data governance.
+
+### Project-Level Roles
+
+Within projects, roles are defined by RDMPs and managed via `Membership`:
+- PI, researcher, steward, viewer (project-scoped)
+- Permissions like `can_manage_rdmp`, `can_edit_paths` are derived from project memberships
+
+### Authorization Flow
+
+1. **Supervisor operations** (update supervisor config) check supervisor memberships
+2. **Project operations** (create samples, edit fields) check project memberships
+3. **Creating projects** requires STEWARD or PI role at supervisor level
+4. **Triggering ingest runs** requires RESEARCHER, STEWARD, or PI role at supervisor level
+5. **Updating supervisor config** requires STEWARD or PI role
+
+### Authorization Helpers
+
+The API uses helper functions in `supervisor/api/deps.py`:
+
+```python
+# Check user has any role for a supervisor
+require_any_supervisor_role(db, user, supervisor_id)
+
+# Check user has specific roles
+require_supervisor_role(db, user, supervisor_id, [SupervisorRole.PI, SupervisorRole.STEWARD])
+```
+
+## Database Architecture (v0.2+)
+
+metaFirst uses a two-tier database architecture:
+
+### Central Database
+
+Stores core metadata shared across the system:
+- Users, authentication, memberships
+- Supervisors and their configuration
+- Projects, samples, field values
+- Storage roots and raw data references
+- RDMPs and templates
+- Audit logs
+
+Location: `supervisor/supervisor.db` (SQLite)
+
+### Per-Supervisor Operational Databases
+
+Each supervisor has its own operational database for runtime state:
+- Ingest run history (start/end times, file counts, errors)
+- Ingestor heartbeats (health status, last seen)
+- Log pointers (future: links to detailed log files)
+
+Location: Configured via `supervisor.supervisor_db_dsn`
+- Default: `supervisor/supervisor_{id}_ops.db`
+- Can be any SQLite file or PostgreSQL database
+
+### Why Separate Databases?
+
+1. **Operational isolation**: One supervisor's runtime state doesn't affect another
+2. **Scalability**: High-frequency operational writes don't compete with metadata reads
+3. **Security**: Operational access can be restricted per-supervisor
+4. **Maintenance**: Operational DBs can be cleared/archived independently
+
+### CLI Commands
+
+```bash
+# List all supervisors and their operational DB status
+python -m supervisor.cli supervisor-db list
+
+# Check status of a supervisor's operational DB
+python -m supervisor.cli supervisor-db status --supervisor 1
+
+# Initialize a supervisor's operational DB
+python -m supervisor.cli supervisor-db init --supervisor 1
+python -m supervisor.cli supervisor-db init --supervisor 1 --dsn "postgresql://user:pass@host/db"
+```
+
+### API Endpoints
+
+Operational state is accessed via `/api/ops/`:
+- `POST /api/ops/projects/{id}/runs` - Create ingest run
+- `GET /api/ops/projects/{id}/runs` - List ingest runs
+- `POST /api/ops/supervisors/{id}/heartbeats` - Record heartbeat
+- `GET /api/ops/supervisors/{id}/heartbeats` - List heartbeats
+
 ## Project Structure
 
 ```
@@ -209,6 +318,9 @@ metaFirst/
 - Ingest helper with browser-based metadata entry
 - Metadata viewer UI
 - Federated discovery index (API-only)
+- Supervisor-scoped roles (PI, STEWARD, RESEARCHER)
+- Primary steward designation per supervisor
+- Per-supervisor operational databases (ingest runs, heartbeats)
 
 ### Planned
 

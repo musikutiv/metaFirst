@@ -6,6 +6,22 @@ supervisor_url: http://localhost:8000
 username: alice
 password: demo123
 
+# -------------------------------------------------------------------------
+# Supervisor binding (v0.2+)
+# -------------------------------------------------------------------------
+# Each ingestor instance is bound to exactly ONE supervisor.
+# Projects from other supervisors will be rejected.
+#
+# - If supervisor_id is specified, use that supervisor.
+# - If omitted AND exactly one supervisor exists, auto-bind to it.
+# - If omitted AND multiple supervisors exist, fail with error listing them.
+#
+# To run ingestors for multiple supervisors, create separate config files:
+#   python metafirst_ingest.py config_supervisor_a.yaml  # terminal 1
+#   python metafirst_ingest.py config_supervisor_b.yaml  # terminal 2
+
+# supervisor_id: 1  # Uncomment and set if multiple supervisors exist
+
 # UI settings (for browser-based metadata entry)
 ui_url: http://localhost:5173  # URL of the supervisor UI
 open_browser: true             # Auto-open browser when file detected

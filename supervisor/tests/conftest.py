@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from supervisor.database import Base, get_db
 from supervisor.main import app
 from supervisor.models.user import User
+from supervisor.models.supervisor import Supervisor
 from supervisor.models.project import Project
 from supervisor.models.membership import Membership
 from supervisor.models.rdmp import RDMPVersion
@@ -85,12 +86,27 @@ def test_user2(db) -> User:
 
 
 @pytest.fixture
-def test_project(db, test_user) -> Project:
+def test_supervisor(db) -> Supervisor:
+    """Create a test supervisor."""
+    supervisor = Supervisor(
+        name="Test Supervisor",
+        description="A test supervisor",
+        supervisor_db_dsn="sqlite:///:memory:",  # In-memory for tests
+    )
+    db.add(supervisor)
+    db.commit()
+    db.refresh(supervisor)
+    return supervisor
+
+
+@pytest.fixture
+def test_project(db, test_user, test_supervisor) -> Project:
     """Create a test project."""
     project = Project(
         name="Test Project",
         description="A test project",
         created_by=test_user.id,
+        supervisor_id=test_supervisor.id,
     )
     db.add(project)
     db.commit()

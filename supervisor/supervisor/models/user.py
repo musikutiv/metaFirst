@@ -20,6 +20,7 @@ class User(Base):
 
     # Relationships
     memberships = relationship("Membership", back_populates="user", foreign_keys="[Membership.user_id]")
+    supervisor_memberships = relationship("SupervisorMembership", back_populates="user", foreign_keys="[SupervisorMembership.user_id]")
     storage_mappings = relationship("StorageRootMapping", back_populates="user")
     created_projects = relationship("Project", back_populates="creator", foreign_keys="[Project.created_by]")
     audit_logs = relationship("AuditLog", back_populates="actor", foreign_keys="[AuditLog.actor_user_id]")

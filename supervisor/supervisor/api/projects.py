@@ -8,6 +8,7 @@ from supervisor.database import get_db
 from supervisor.models.user import User
 from supervisor.models.project import Project
 from supervisor.models.membership import Membership
+from supervisor.models.supervisor import Supervisor
 from supervisor.schemas.project import (
     Project as ProjectSchema,
     ProjectCreate,
@@ -16,7 +17,8 @@ from supervisor.schemas.project import (
     MembershipCreate,
     MembershipUpdate,
 )
-from supervisor.api.deps import get_current_active_user
+from supervisor.api.deps import get_current_active_user, require_supervisor_role
+from supervisor.models.supervisor_membership import SupervisorRole
 from supervisor.services.permission_service import check_permission
 
 router = APIRouter()
@@ -44,7 +46,26 @@ def create_project(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)]
 ):
-    """Create a new project."""
+    """Create a new project.
+
+    Requires STEWARD or PI role for the supervisor.
+    """
+    # Validate supervisor exists
+    supervisor = db.query(Supervisor).filter(Supervisor.id == project_data.supervisor_id).first()
+    if not supervisor:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Supervisor not found"
+        )
+    if not supervisor.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Supervisor is not active"
+        )
+
+    # Require STEWARD or PI role to create projects
+    require_supervisor_role(db, current_user, project_data.supervisor_id, [SupervisorRole.STEWARD, SupervisorRole.PI])
+
     # Check if project name already exists
     existing = db.query(Project).filter(Project.name == project_data.name).first()
     if existing:
@@ -57,7 +78,8 @@ def create_project(
     project = Project(
         name=project_data.name,
         description=project_data.description,
-        created_by=current_user.id
+        created_by=current_user.id,
+        supervisor_id=project_data.supervisor_id
     )
     db.add(project)
     db.commit()

@@ -258,6 +258,90 @@ class SupervisorClient:
             "GET", f"/api/projects/{project_id}/storage-roots", retries=3, retry_delay=1.0
         )
 
+    def get_supervisors(self) -> list[dict]:
+        """Get list of supervisors.
+
+        Returns:
+            List of supervisor dicts with at least 'id' and 'name' fields.
+
+        Raises:
+            Exception: On API error (401, 5xx after retries, etc.)
+        """
+        return self._request("GET", "/api/supervisors/", retries=3, retry_delay=1.0)
+
+    def get_project(self, project_id: int) -> dict:
+        """Get a single project by ID.
+
+        Returns:
+            Project dict with 'id', 'name', 'supervisor_id', etc.
+
+        Raises:
+            Exception: On API error (401, 404, etc.)
+        """
+        return self._request("GET", f"/api/projects/{project_id}")
+
+
+class SupervisorMismatchError(Exception):
+    """Raised when a project belongs to a different supervisor than configured."""
+
+    def __init__(self, project_id: int, project_supervisor_id: int, configured_supervisor_id: int):
+        self.project_id = project_id
+        self.project_supervisor_id = project_supervisor_id
+        self.configured_supervisor_id = configured_supervisor_id
+        super().__init__(
+            f"Project {project_id} belongs to supervisor {project_supervisor_id} "
+            f"but this ingestor is configured for supervisor {configured_supervisor_id}. "
+            f"Start a separate ingestor instance for supervisor {project_supervisor_id}."
+        )
+
+
+def resolve_supervisor_id(
+    config: dict,
+    client: SupervisorClient,
+) -> tuple[int, str | None]:
+    """Resolve the supervisor_id from config or auto-detect.
+
+    Resolution rules:
+    1. If supervisor_id is explicitly provided in config, use it.
+    2. If not provided, fetch supervisors from API:
+       - If exactly 1 supervisor exists, auto-bind to it.
+       - If 0 or >1 supervisors, fail with clear error.
+
+    Args:
+        config: Config dict from YAML
+        client: SupervisorClient for API calls
+
+    Returns:
+        Tuple of (supervisor_id, None) on success, or
+        (0, error_message) on failure.
+    """
+    # Check for explicit supervisor_id in config
+    if "supervisor_id" in config and config["supervisor_id"] is not None:
+        return int(config["supervisor_id"]), None
+
+    # Auto-detect: fetch supervisors
+    try:
+        supervisors = client.get_supervisors()
+    except Exception as e:
+        return 0, f"Failed to fetch supervisors for auto-detection: {e}"
+
+    if len(supervisors) == 0:
+        return 0, "No supervisors found. Create a supervisor first."
+
+    if len(supervisors) == 1:
+        supervisor = supervisors[0]
+        logger.info(
+            f"Auto-detected single supervisor: {supervisor['name']} (id={supervisor['id']})"
+        )
+        return supervisor["id"], None
+
+    # Multiple supervisors - require explicit config
+    supervisor_names = [f"  - {s['name']} (id={s['id']})" for s in supervisors]
+    return 0, (
+        f"Multiple supervisors found. Add 'supervisor_id' to config:\n"
+        + "\n".join(supervisor_names)
+    )
+
 
 class WatcherConfig:
     """Configuration for a single watched folder."""
@@ -298,6 +382,49 @@ class WatcherConfig:
         return None
 
 
+def validate_project_supervisor(
+    client: SupervisorClient,
+    project_id: int,
+    expected_supervisor_id: int,
+    project_cache: dict[int, dict] | None = None,
+) -> dict:
+    """Validate that a project belongs to the expected supervisor.
+
+    Args:
+        client: SupervisorClient for API calls
+        project_id: Project ID to validate
+        expected_supervisor_id: The supervisor_id this ingestor is configured for
+        project_cache: Optional cache of projects by ID to avoid repeated API calls
+
+    Returns:
+        The project dict on success.
+
+    Raises:
+        SupervisorMismatchError: If project belongs to different supervisor.
+        Exception: On API error (project not found, etc.)
+    """
+    # Check cache first
+    if project_cache is not None and project_id in project_cache:
+        project = project_cache[project_id]
+    else:
+        project = client.get_project(project_id)
+        if project_cache is not None:
+            project_cache[project_id] = project
+
+    project_supervisor_id = project.get("supervisor_id")
+    if project_supervisor_id is None:
+        raise Exception(f"Project {project_id} has no supervisor_id (data integrity issue)")
+
+    if project_supervisor_id != expected_supervisor_id:
+        raise SupervisorMismatchError(
+            project_id=project_id,
+            project_supervisor_id=project_supervisor_id,
+            configured_supervisor_id=expected_supervisor_id,
+        )
+
+    return project
+
+
 def compute_file_hash(file_path: Path, chunk_size: int = 8192) -> str:
     """Compute SHA256 hash of a file."""
     sha256 = hashlib.sha256()
@@ -314,6 +441,7 @@ class IngestEventHandler(FileSystemEventHandler):
         self,
         client: SupervisorClient,
         watcher_config: WatcherConfig,
+        supervisor_id: int,
         compute_hash: bool = False,
         open_browser: bool = False,
         ui_base_url: str | None = None,
@@ -321,10 +449,13 @@ class IngestEventHandler(FileSystemEventHandler):
         super().__init__()
         self.client = client
         self.config = watcher_config
+        self.supervisor_id = supervisor_id
         self.compute_hash = compute_hash
         self.open_browser = open_browser
         self.ui_base_url = ui_base_url or "http://localhost:5173"
         self.processed_files: set[str] = set()
+        # Cache project lookups to avoid repeated API calls
+        self._project_cache: dict[int, dict] = {}
 
     def on_created(self, event: FileCreatedEvent):
         """Handle file creation event."""
@@ -354,6 +485,21 @@ class IngestEventHandler(FileSystemEventHandler):
     def _process_file(self, file_path: Path):
         """Process a newly created file - create pending ingest."""
         print(f"\n[NEW FILE] {file_path}")
+
+        # Validate project belongs to this ingestor's supervisor
+        try:
+            validate_project_supervisor(
+                client=self.client,
+                project_id=self.config.project_id,
+                expected_supervisor_id=self.supervisor_id,
+                project_cache=self._project_cache,
+            )
+        except SupervisorMismatchError as e:
+            print(f"  [REJECT] {e}")
+            return
+        except Exception as e:
+            print(f"  [ERROR] Failed to validate project supervisor: {e}")
+            return
 
         # Compute relative path
         try:
@@ -621,6 +767,24 @@ def run_watcher(config_path: str):
         print(f"[ERROR] Failed to connect: {e}")
         sys.exit(1)
 
+    # Resolve supervisor_id (required for scoping)
+    supervisor_id, error = resolve_supervisor_id(config, client)
+    if error:
+        print(f"[ERROR] {error}")
+        sys.exit(1)
+
+    # Show supervisor binding
+    try:
+        supervisors = client.get_supervisors()
+        supervisor_name = next(
+            (s["name"] for s in supervisors if s["id"] == supervisor_id),
+            f"<unknown id={supervisor_id}>"
+        )
+    except Exception:
+        supervisor_name = f"<id={supervisor_id}>"
+
+    print(f"Bound to supervisor: {supervisor_name} (id={supervisor_id})")
+
     # Get UI settings
     ui_base_url = config.get("ui_url", "http://localhost:5173")
     open_browser = config.get("open_browser", False)
@@ -695,6 +859,7 @@ def run_watcher(config_path: str):
         handler = IngestEventHandler(
             client=client,
             watcher_config=watcher_config,
+            supervisor_id=supervisor_id,
             compute_hash=config.get("compute_hash", False),
             open_browser=open_browser,
             ui_base_url=ui_base_url,
@@ -741,6 +906,11 @@ supervisor_url: http://localhost:8000
 ui_url: http://localhost:5173
 username: alice
 password: demo123
+
+# Supervisor binding (required if multiple supervisors exist)
+# If omitted and exactly one supervisor exists, auto-binds to it.
+supervisor_id: 1
+
 compute_hash: false
 open_browser: true  # Open browser when new file detected
 watchers:

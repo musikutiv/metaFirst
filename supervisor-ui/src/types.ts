@@ -10,6 +10,7 @@ export interface Project {
   description: string | null;
   created_at: string;
   created_by: number;
+  supervisor_id: number;
   is_active: boolean;
 }
 

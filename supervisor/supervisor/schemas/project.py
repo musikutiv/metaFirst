@@ -14,7 +14,7 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     """Project creation schema."""
 
-    pass
+    supervisor_id: int = Field(..., description="ID of the supervisor that owns this project")
 
 
 class ProjectUpdate(BaseModel):
@@ -30,6 +30,7 @@ class Project(ProjectBase):
     id: int
     created_at: datetime
     created_by: int
+    supervisor_id: int
     is_active: bool
 
     class Config:

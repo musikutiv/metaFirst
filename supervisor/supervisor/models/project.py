@@ -16,9 +16,11 @@ class Project(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.id"), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relationships
+    supervisor = relationship("Supervisor", back_populates="projects")
     creator = relationship("User", back_populates="created_projects", foreign_keys=[created_by])
     memberships = relationship("Membership", back_populates="project", cascade="all, delete-orphan")
     storage_roots = relationship("StorageRoot", back_populates="project", cascade="all, delete-orphan")

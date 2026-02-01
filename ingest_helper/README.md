@@ -37,6 +37,9 @@ ui_url: http://localhost:5173
 open_browser: true
 compute_hash: false
 
+# Supervisor binding (required if multiple supervisors exist)
+supervisor_id: 1
+
 watchers:
   - watch_path: /Users/alice/data/qpcr
     project_id: 1
@@ -44,6 +47,64 @@ watchers:
 ```
 
 **Note:** The supervisor must be started with `--host 0.0.0.0` for ingest helpers running on other machines to connect.
+
+## Supervisor Scoping (v0.2+)
+
+Each ingestor instance is bound to **exactly one supervisor**. This ensures operational isolation between different supervisors (labs, departments, etc.).
+
+### How It Works
+
+- If `supervisor_id` is specified in config, that supervisor is used
+- If omitted and exactly one supervisor exists, auto-binds to it
+- If omitted and multiple supervisors exist, fails with a clear error listing available supervisors
+
+### Cross-Supervisor Rejection
+
+When a file is detected, the ingestor validates that the project belongs to its configured supervisor. If mismatched:
+
+```
+[NEW FILE] /data/qpcr/sample.fastq
+  [REJECT] Project 5 belongs to supervisor 2 but this ingestor is configured
+           for supervisor 1. Start a separate ingestor instance for supervisor 2.
+```
+
+### Running Multiple Ingestors
+
+To ingest data for projects across multiple supervisors, run separate ingestor instances:
+
+```bash
+# Terminal 1: Ingestor for Lab A (supervisor_id: 1)
+python metafirst_ingest.py config_lab_a.yaml
+
+# Terminal 2: Ingestor for Lab B (supervisor_id: 2)
+python metafirst_ingest.py config_lab_b.yaml
+```
+
+Example configs:
+
+**config_lab_a.yaml:**
+```yaml
+supervisor_url: http://localhost:8000
+username: alice
+password: demo123
+supervisor_id: 1
+watchers:
+  - watch_path: /data/lab_a/samples
+    project_name: "Lab A Project"
+    storage_root_name: "LOCAL_DATA"
+```
+
+**config_lab_b.yaml:**
+```yaml
+supervisor_url: http://localhost:8000
+username: bob
+password: demo123
+supervisor_id: 2
+watchers:
+  - watch_path: /data/lab_b/samples
+    project_name: "Lab B Project"
+    storage_root_name: "LOCAL_DATA"
+```
 
 ### Watcher Configuration Options
 
@@ -96,6 +157,7 @@ metaFirst Ingest Helper
 ============================================================
 Config file: config.yaml
 Connected to supervisor at http://localhost:8000
+Bound to supervisor: Demo Lab (id=1)
 UI URL: http://localhost:5173
 Auto-open browser: true
 ------------------------------------------------------------
@@ -160,6 +222,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/projects/1/stor
 | `Storage root not found: 'X'` | Storage root doesn't exist in the project | Verify storage root name in project |
 | `Ambiguous project_name` | Multiple projects match (shouldn't happen) | Contact admin |
 | `Authentication failed` | Invalid credentials | Check username/password |
+| `Multiple supervisors found` | No supervisor_id in config, multiple exist | Add `supervisor_id: N` to config |
+| `Project belongs to supervisor X` | Project's supervisor differs from ingestor's | Use separate config/instance for that supervisor |
 
 ## Sample Identifier Extraction
 
