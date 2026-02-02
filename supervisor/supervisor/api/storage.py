@@ -28,7 +28,9 @@ from supervisor.schemas.storage import (
     PendingIngest as PendingIngestSchema,
     PendingIngestWithDetails,
     PendingIngestFinalize,
+    SampleIdDetectionInfo,
 )
+from supervisor.services.sample_id_service import extract_sample_id_from_filename
 from supervisor.api.deps import get_current_active_user
 from supervisor.services.permission_service import check_permission
 from supervisor.services.audit_service import (
@@ -763,11 +765,30 @@ def list_pending_ingests(
 
     pending_ingests = query.order_by(PendingIngest.created_at.desc()).all()
 
+    # Get project for detection rule
+    project = db.query(Project).filter(Project.id == project_id).first()
+
     # Enrich with details
     result = []
     for item in pending_ingests:
         storage_root_name = item.storage_root.name if item.storage_root else None
         project_name = item.project.name if item.project else None
+
+        # Detect sample ID from filename
+        detection_result = extract_sample_id_from_filename(
+            item.relative_path,
+            project.sample_id_rule_type if project else None,
+            project.sample_id_regex if project else None,
+        )
+
+        detection_info = SampleIdDetectionInfo(
+            rule_type=detection_result.rule_type,
+            regex=detection_result.regex,
+            example_filename=detection_result.example_filename,
+            example_result=detection_result.detected_sample_id,
+            configured=bool(project and project.sample_id_rule_type and project.sample_id_regex),
+            explanation=detection_result.explanation,
+        )
 
         result.append(
             PendingIngestWithDetails(
@@ -785,6 +806,8 @@ def list_pending_ingests(
                 raw_data_item_id=item.raw_data_item_id,
                 storage_root_name=storage_root_name,
                 project_name=project_name,
+                detected_sample_id=detection_result.detected_sample_id,
+                detection_info=detection_info,
             )
         )
 
@@ -820,6 +843,23 @@ def get_pending_ingest(
 
     storage_root_name = item.storage_root.name if item.storage_root else None
     project_name = item.project.name if item.project else None
+    project = item.project
+
+    # Detect sample ID from filename
+    detection_result = extract_sample_id_from_filename(
+        item.relative_path,
+        project.sample_id_rule_type if project else None,
+        project.sample_id_regex if project else None,
+    )
+
+    detection_info = SampleIdDetectionInfo(
+        rule_type=detection_result.rule_type,
+        regex=detection_result.regex,
+        example_filename=detection_result.example_filename,
+        example_result=detection_result.detected_sample_id,
+        configured=bool(project and project.sample_id_rule_type and project.sample_id_regex),
+        explanation=detection_result.explanation,
+    )
 
     return PendingIngestWithDetails(
         id=item.id,
@@ -836,6 +876,8 @@ def get_pending_ingest(
         raw_data_item_id=item.raw_data_item_id,
         storage_root_name=storage_root_name,
         project_name=project_name,
+        detected_sample_id=detection_result.detected_sample_id,
+        detection_info=detection_info,
     )
 
 

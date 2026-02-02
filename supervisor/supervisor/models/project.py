@@ -19,6 +19,10 @@ class Project(Base):
     supervisor_id = Column(Integer, ForeignKey("supervisors.id"), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
+    # Sample ID extraction rule (for auto-detecting sample identifiers from filenames)
+    sample_id_rule_type = Column(String(50), nullable=True)  # e.g., "filename_regex"
+    sample_id_regex = Column(String(500), nullable=True)  # regex pattern with (?P<sample_id>...) or group 1
+
     # Relationships
     supervisor = relationship("Supervisor", back_populates="projects")
     creator = relationship("User", back_populates="created_projects", foreign_keys=[created_by])

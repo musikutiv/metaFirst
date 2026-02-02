@@ -22,6 +22,8 @@ class ProjectUpdate(BaseModel):
 
     name: str | None = None
     description: str | None = None
+    sample_id_rule_type: str | None = None
+    sample_id_regex: str | None = None
 
 
 class Project(ProjectBase):
@@ -32,6 +34,8 @@ class Project(ProjectBase):
     created_by: int
     supervisor_id: int
     is_active: bool
+    sample_id_rule_type: str | None = None
+    sample_id_regex: str | None = None
 
     class Config:
         from_attributes = True

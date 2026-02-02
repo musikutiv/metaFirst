@@ -111,6 +111,53 @@ def get_project(
     return project
 
 
+@router.patch("/{project_id}", response_model=ProjectSchema)
+def update_project(
+    project_id: int,
+    project_data: ProjectUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    """Update project settings.
+
+    Requires STEWARD or PI role for the project's supervisor.
+    """
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # Require STEWARD or PI role to update projects
+    require_supervisor_role(db, current_user, project.supervisor_id, [SupervisorRole.STEWARD, SupervisorRole.PI])
+
+    # Update fields if provided
+    if project_data.name is not None:
+        # Check if new name conflicts
+        existing = db.query(Project).filter(
+            Project.name == project_data.name,
+            Project.id != project_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project name already exists"
+            )
+        project.name = project_data.name
+
+    if project_data.description is not None:
+        project.description = project_data.description
+
+    if project_data.sample_id_rule_type is not None:
+        project.sample_id_rule_type = project_data.sample_id_rule_type
+
+    if project_data.sample_id_regex is not None:
+        project.sample_id_regex = project_data.sample_id_regex
+
+    db.commit()
+    db.refresh(project)
+
+    return project
+
+
 # Memberships
 
 @router.get("/{project_id}/memberships", response_model=list[MembershipSchema])

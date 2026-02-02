@@ -209,11 +209,25 @@ class PendingIngest(BaseModel):
         from_attributes = True
 
 
+class SampleIdDetectionInfo(BaseModel):
+    """Information about sample ID detection from filename."""
+
+    rule_type: str | None = None
+    regex: str | None = None
+    example_filename: str | None = None
+    example_result: str | None = None
+    configured: bool = False
+    explanation: str | None = None
+
+
 class PendingIngestWithDetails(PendingIngest):
     """Pending ingest with storage root details."""
 
     storage_root_name: str | None = None
     project_name: str | None = None
+    # Sample ID detection info
+    detected_sample_id: str | None = None
+    detection_info: SampleIdDetectionInfo | None = None
 
 
 class PendingIngestFinalize(BaseModel):
