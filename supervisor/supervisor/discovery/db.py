@@ -79,7 +79,7 @@ def upsert_indexed_sample(db: Session, record: dict) -> IndexedSample:
 
     if existing:
         # Update existing record
-        for key in ["rdmp_version", "release_id", "visibility", "metadata_json", "search_text"]:
+        for key in ["rdmp_version", "release_id", "visibility", "metadata_json", "search_text", "origin_supervisor_id"]:
             if key in record:
                 setattr(existing, key, record[key])
         existing.updated_at = datetime.now(timezone.utc)
@@ -90,6 +90,7 @@ def upsert_indexed_sample(db: Session, record: dict) -> IndexedSample:
         # Create new record
         sample = IndexedSample(
             origin=record["origin"],
+            origin_supervisor_id=record.get("origin_supervisor_id"),
             origin_project_id=record["origin_project_id"],
             origin_sample_id=record["origin_sample_id"],
             rdmp_version=record.get("rdmp_version"),
@@ -110,8 +111,9 @@ def search_samples(
     visibility_list: list[str],
     offset: int = 0,
     limit: int = 20,
+    user_supervisor_ids: list[int] | None = None,
 ) -> tuple[list[IndexedSample], int]:
-    """Search indexed samples using SQL LIKE.
+    """Search indexed samples using SQL LIKE with visibility filtering.
 
     Args:
         db: Database session
@@ -119,13 +121,36 @@ def search_samples(
         visibility_list: List of visibility levels to include
         offset: Pagination offset
         limit: Max results to return
+        user_supervisor_ids: List of supervisor IDs the user is a member of (for PRIVATE filtering)
 
     Returns:
         Tuple of (list of matching samples, total count)
     """
-    base_query = db.query(IndexedSample).filter(
-        IndexedSample.visibility.in_(visibility_list)
-    )
+    from sqlalchemy import or_
+
+    # Build visibility filter
+    # PUBLIC and INSTITUTION: include all matching records
+    # PRIVATE: only include if user is member of origin_supervisor_id
+    vis_conditions = []
+
+    for vis in visibility_list:
+        if vis == "PRIVATE":
+            if user_supervisor_ids:
+                # User can see PRIVATE records from their supervisors
+                vis_conditions.append(
+                    (IndexedSample.visibility == "PRIVATE") &
+                    (IndexedSample.origin_supervisor_id.in_(user_supervisor_ids))
+                )
+            # If no supervisor IDs, user can't see any PRIVATE records
+        else:
+            # PUBLIC and INSTITUTION: include all
+            vis_conditions.append(IndexedSample.visibility == vis)
+
+    if not vis_conditions:
+        # No valid visibility conditions, return empty
+        return [], 0
+
+    base_query = db.query(IndexedSample).filter(or_(*vis_conditions))
 
     if query:
         search_pattern = f"%{query}%"

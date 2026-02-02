@@ -3,9 +3,10 @@
 import json
 import logging
 import os
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -16,10 +17,17 @@ from supervisor.discovery.db import (
     get_sample_by_id,
 )
 from supervisor.discovery.models import Visibility
+from supervisor.database import get_db
+from supervisor.models.user import User
+from supervisor.models.supervisor_membership import SupervisorMembership
+from supervisor.utils.security import decode_access_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Optional OAuth2 scheme for discovery endpoints
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 # --- Schemas ---
@@ -27,6 +35,7 @@ router = APIRouter()
 
 class PushRecord(BaseModel):
     """A single record to push to the index."""
+    origin_supervisor_id: int | None = None  # For PRIVATE visibility filtering
     origin_project_id: int
     origin_sample_id: int
     sample_identifier: str | None = None
@@ -128,20 +137,37 @@ def verify_api_key(authorization: str | None = Header(default=None)) -> bool:
     return True
 
 
-def optional_api_key(authorization: str | None = Header(default=None)) -> bool:
-    """Check API key if provided, return True if valid or not provided."""
-    if not authorization:
-        return False
+def get_optional_current_user(
+    token: Annotated[str | None, Depends(oauth2_scheme_optional)],
+    db: Annotated[Session, Depends(get_db)],
+) -> User | None:
+    """Get current user from JWT token if provided, otherwise return None."""
+    if not token:
+        return None
 
-    api_key = get_api_key()
-    if not api_key:
-        return False
+    try:
+        payload = decode_access_token(token)
+        if payload is None:
+            return None
+        username = payload.get("username")
+        if username is None:
+            return None
+        user = db.query(User).filter(User.username == username).first()
+        return user
+    except Exception:
+        return None
 
-    parts = authorization.split(" ", 1)
-    if len(parts) == 2 and parts[0] == "ApiKey" and parts[1] == api_key:
-        return True
 
-    return False
+def get_user_supervisor_ids(db: Session, user: User | None) -> list[int]:
+    """Get list of supervisor IDs the user is a member of."""
+    if not user:
+        return []
+
+    memberships = db.query(SupervisorMembership.supervisor_id).filter(
+        SupervisorMembership.user_id == user.id
+    ).all()
+
+    return [m.supervisor_id for m in memberships]
 
 
 # --- Endpoints ---
@@ -178,6 +204,7 @@ def push_records(
 
             upsert_indexed_sample(db, {
                 "origin": payload.origin,
+                "origin_supervisor_id": record.origin_supervisor_id,
                 "origin_project_id": record.origin_project_id,
                 "origin_sample_id": record.origin_sample_id,
                 "rdmp_version": record.rdmp_version,
@@ -198,32 +225,45 @@ def push_records(
 
 @router.get("/search", response_model=SearchResponse)
 def search(
-    db: Annotated[Session, Depends(get_discovery_db)],
+    discovery_db: Annotated[Session, Depends(get_discovery_db)],
+    central_db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User | None, Depends(get_optional_current_user)],
     q: str = Query(default="", description="Search query"),
     visibility: str = Query(default="PUBLIC", description="Visibility filter (comma-separated)"),
     offset: int = Query(default=0, alias="from", ge=0, description="Pagination offset"),
     size: int = Query(default=20, ge=1, le=100, description="Results per page"),
-    authorization: str | None = Header(default=None),
 ):
     """Search the discovery index.
 
-    PUBLIC visibility searches are unauthenticated.
-    Other visibilities require API key.
+    Visibility filtering:
+    - PUBLIC: No authentication required
+    - INSTITUTION: Requires authenticated user (any user)
+    - PRIVATE: Requires authenticated user who is member of the record's supervisor
     """
     # Parse visibility list
     vis_list = [v.strip().upper() for v in visibility.split(",")]
 
-    # Check if auth is needed
-    has_auth = optional_api_key(authorization)
-    non_public = [v for v in vis_list if v != Visibility.PUBLIC.value]
+    # Validate visibility values
+    valid_vis = {v.value for v in Visibility}
+    for v in vis_list:
+        if v not in valid_vis:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid visibility: {v}. Must be one of: {', '.join(valid_vis)}",
+            )
 
-    if non_public and not has_auth:
+    # Check auth requirements
+    requires_auth = any(v != Visibility.PUBLIC.value for v in vis_list)
+    if requires_auth and not current_user:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"API key required for visibility: {', '.join(non_public)}",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for non-PUBLIC visibility",
         )
 
-    results, total = search_samples(db, q, vis_list, offset, size)
+    # Get user's supervisor IDs for PRIVATE filtering
+    user_supervisor_ids = get_user_supervisor_ids(central_db, current_user)
+
+    results, total = search_samples(discovery_db, q, vis_list, offset, size, user_supervisor_ids)
 
     hits = []
     for sample in results:
@@ -252,14 +292,18 @@ def search(
 @router.get("/records/{record_id}", response_model=RecordDetail)
 def get_record(
     record_id: int,
-    db: Annotated[Session, Depends(get_discovery_db)],
-    authorization: str | None = Header(default=None),
+    discovery_db: Annotated[Session, Depends(get_discovery_db)],
+    central_db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User | None, Depends(get_optional_current_user)],
 ):
     """Get full details of an indexed record.
 
-    Respects visibility: PUBLIC is open, others require API key.
+    Visibility filtering:
+    - PUBLIC: No authentication required
+    - INSTITUTION: Requires authenticated user
+    - PRIVATE: Requires authenticated user who is member of the record's supervisor
     """
-    sample = get_sample_by_id(db, record_id)
+    sample = get_sample_by_id(discovery_db, record_id)
 
     if not sample:
         raise HTTPException(
@@ -268,12 +312,27 @@ def get_record(
         )
 
     # Check visibility
-    has_auth = optional_api_key(authorization)
-    if sample.visibility != Visibility.PUBLIC.value and not has_auth:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"API key required for {sample.visibility} records",
-        )
+    if sample.visibility == Visibility.PUBLIC.value:
+        pass  # No auth required
+    elif sample.visibility == Visibility.INSTITUTION.value:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for INSTITUTION records",
+            )
+    elif sample.visibility == Visibility.PRIVATE.value:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for PRIVATE records",
+            )
+        # Check if user is member of the record's supervisor
+        user_supervisor_ids = get_user_supervisor_ids(central_db, current_user)
+        if sample.origin_supervisor_id not in user_supervisor_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: not a member of the record's supervisor",
+            )
 
     # Parse metadata
     metadata = None

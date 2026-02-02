@@ -22,6 +22,7 @@ class Sample(SampleBase):
 
     id: int
     project_id: int
+    visibility: str = "PRIVATE"
     created_at: datetime
     created_by: int
 

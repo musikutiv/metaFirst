@@ -38,6 +38,10 @@ class Supervisor(Base):
     # Nullable until assigned. Only one primary steward per supervisor.
     primary_steward_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
+    # Automation settings
+    # If False, the execute endpoint for remediation tasks returns 403
+    enable_automated_execution = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     projects = relationship("Project", back_populates="supervisor", cascade="all, delete-orphan")
     memberships = relationship("SupervisorMembership", back_populates="supervisor", cascade="all, delete-orphan")

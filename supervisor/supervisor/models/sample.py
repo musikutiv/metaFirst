@@ -1,10 +1,23 @@
 """Sample and field value models - dynamic metadata storage."""
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Index
+from enum import Enum as PyEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Index, Enum
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from supervisor.database import Base
+
+
+class MetadataVisibility(str, PyEnum):
+    """Visibility level for metadata in discovery.
+
+    - PRIVATE: Only visible to members of the owning supervisor
+    - INSTITUTION: Visible to any authenticated user
+    - PUBLIC: Visible to anyone (no auth required)
+    """
+    PRIVATE = "PRIVATE"
+    INSTITUTION = "INSTITUTION"
+    PUBLIC = "PUBLIC"
 
 
 class Sample(Base):
@@ -15,6 +28,11 @@ class Sample(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     sample_identifier = Column(String(255), nullable=False)  # User-facing ID
+    visibility = Column(
+        Enum(MetadataVisibility, values_callable=lambda x: [e.value for e in x]),
+        default=MetadataVisibility.PRIVATE,
+        nullable=False,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 

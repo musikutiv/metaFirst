@@ -84,6 +84,10 @@ class RDMPVersion(Base):
     rdmp_json = Column(JSON, nullable=False)  # Active RDMP for project
     provenance_json = Column(JSON, nullable=True)  # Template reference, changes, parameters
 
+    # Retention and embargo settings
+    retention_days = Column(Integer, nullable=True)  # Days to retain data after creation
+    embargo_until = Column(DateTime(timezone=True), nullable=True)  # Data under embargo until this date
+
     # Relationships
     project = relationship("Project", back_populates="rdmp_versions")
     creator = relationship("User", foreign_keys=[created_by])

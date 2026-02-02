@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from supervisor.config import get_settings
-from supervisor.api import auth, rdmp, projects, samples, storage, supervisors, operational, rdmp_management
+from supervisor.api import auth, rdmp, projects, samples, storage, supervisors, operational, rdmp_management, remediation
 from supervisor.discovery import api as discovery_api
 from supervisor.database import Base, engine
 
@@ -39,6 +39,7 @@ app.include_router(storage.router, prefix="/api", tags=["storage"])
 app.include_router(operational.router, prefix="/api/ops", tags=["operational"])
 app.include_router(rdmp_management.router, prefix="/api", tags=["rdmp-management"])
 app.include_router(discovery_api.router, prefix="/api/discovery", tags=["discovery"])
+app.include_router(remediation.router, prefix="/api", tags=["remediation"])
 
 
 @app.get("/health")

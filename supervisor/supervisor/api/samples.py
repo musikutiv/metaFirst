@@ -3,21 +3,29 @@
 from typing import Annotated, Any
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from supervisor.database import get_db
 from supervisor.models.user import User
-from supervisor.models.sample import Sample, SampleFieldValue
+from supervisor.models.project import Project
+from supervisor.models.sample import Sample, SampleFieldValue, MetadataVisibility
 from supervisor.models.membership import Membership
+from supervisor.models.supervisor_membership import SupervisorRole
 from supervisor.schemas.sample import (
     Sample as SampleSchema,
     SampleCreate,
     SampleWithFields,
     FieldValueSet,
 )
-from supervisor.api.deps import get_current_active_user
+from supervisor.api.deps import get_current_active_user, require_supervisor_role
 from supervisor.services.rdmp_service import get_current_rdmp, check_sample_completeness, validate_field_value
 from supervisor.services.permission_service import check_permission
+
+
+class VisibilityUpdate(BaseModel):
+    """Schema for updating sample visibility."""
+    visibility: str
 
 router = APIRouter()
 
@@ -217,3 +225,54 @@ def set_field_value(
     db.commit()
 
     return {"status": "success", "field_key": field_key, "value": field_data.value}
+
+
+@router.patch("/samples/{sample_id}/visibility")
+def set_sample_visibility(
+    sample_id: int,
+    visibility_data: VisibilityUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    """Set metadata visibility for a sample.
+
+    Requires STEWARD or PI role at the supervisor level.
+
+    Visibility levels:
+    - PRIVATE: Only visible to members of the owning supervisor
+    - INSTITUTION: Visible to any authenticated user
+    - PUBLIC: Visible to anyone (no auth required)
+    """
+    # Get sample
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+
+    # Get project to find supervisor
+    project = db.query(Project).filter(Project.id == sample.project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # Require STEWARD or PI role at supervisor level
+    require_supervisor_role(db, current_user, project.supervisor_id, [SupervisorRole.STEWARD, SupervisorRole.PI])
+
+    # Validate visibility value
+    try:
+        new_visibility = MetadataVisibility(visibility_data.visibility.upper())
+    except ValueError:
+        valid_values = [v.value for v in MetadataVisibility]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid visibility. Must be one of: {', '.join(valid_values)}"
+        )
+
+    # Update visibility
+    sample.visibility = new_visibility
+    db.commit()
+    db.refresh(sample)
+
+    return {
+        "status": "success",
+        "sample_id": sample.id,
+        "visibility": sample.visibility.value
+    }

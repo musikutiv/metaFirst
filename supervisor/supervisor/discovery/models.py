@@ -13,9 +13,15 @@ DiscoveryBase = declarative_base()
 
 
 class Visibility(str, enum.Enum):
-    PUBLIC = "PUBLIC"
-    REGISTERED = "REGISTERED"
+    """Visibility levels for discovery index.
+
+    - PRIVATE: Only visible to members of the owning supervisor
+    - INSTITUTION: Visible to any authenticated user
+    - PUBLIC: Visible to anyone (no auth required)
+    """
     PRIVATE = "PRIVATE"
+    INSTITUTION = "INSTITUTION"
+    PUBLIC = "PUBLIC"
 
 
 class IndexedSample(DiscoveryBase):
@@ -27,6 +33,7 @@ class IndexedSample(DiscoveryBase):
 
     # Origin tracking
     origin = Column(String(255), nullable=False)  # e.g., "supervisor-a.example.com"
+    origin_supervisor_id = Column(Integer, nullable=True)  # Supervisor ID for membership checks
     origin_project_id = Column(Integer, nullable=False)
     origin_sample_id = Column(Integer, nullable=False)
 
