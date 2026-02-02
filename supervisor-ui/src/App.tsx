@@ -13,6 +13,8 @@ import { ProjectSettings } from './components/ProjectSettings';
 import { RDMPManagement } from './components/RDMPManagement';
 import { CreateProjectWizard } from './components/CreateProjectWizard';
 import { NoActiveRDMPBanner } from './components/NoActiveRDMPBanner';
+import { SupervisorMembers } from './components/SupervisorMembers';
+import { ProjectsOverview } from './components/ProjectsOverview';
 import type { User, Project, RDMP, Sample, RawDataItem, PendingIngest, StorageRoot, RDMPVersion } from './types';
 
 function App() {
@@ -101,7 +103,7 @@ function App() {
     const doLoad = async () => {
       setLoadingData(true);
       try {
-        const [rdmpData, activeRdmpData, samplesData, rawDataData, storageRootsData] = await Promise.all([
+        const [rdmpData, activeRdmpData, samplesResponse, rawDataData, storageRootsData] = await Promise.all([
           apiClient.getProjectRDMP(projectIdToLoad).catch(() => null),
           apiClient.getActiveRDMP(projectIdToLoad).catch(() => null),
           apiClient.getSamples(projectIdToLoad),
@@ -113,7 +115,7 @@ function App() {
         if (isActive) {
           setRdmp(rdmpData);
           setActiveRDMP(activeRdmpData);
-          setSamples(samplesData);
+          setSamples(samplesResponse.items);
           setRawData(rawDataData);
           setStorageRoots(storageRootsData);
           setLoadingData(false);
@@ -311,6 +313,25 @@ function App() {
 
       <main style={styles.main}>
         <Routes>
+          {/* Projects Overview page */}
+          <Route
+            path="/overview"
+            element={
+              <ProjectsOverview
+                onSelectProject={(projectId) => {
+                  handleProjectSelect(projectId);
+                  navigate('/');
+                }}
+              />
+            }
+          />
+
+          {/* Supervisor Members management */}
+          <Route
+            path="/supervisors/:supervisorId/members"
+            element={<SupervisorMembers />}
+          />
+
           {/* Direct ingest page - no project selection required */}
           <Route
             path="/ingest/:pendingId"

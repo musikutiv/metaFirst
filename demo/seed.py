@@ -22,7 +22,7 @@ from supervisor.models.supervisor import Supervisor
 from supervisor.models.project import Project
 from supervisor.models.membership import Membership
 from supervisor.models.supervisor_membership import SupervisorMembership, SupervisorRole
-from supervisor.models.rdmp import RDMPTemplate, RDMPTemplateVersion, RDMPVersion
+from supervisor.models.rdmp import RDMPTemplate, RDMPTemplateVersion, RDMPVersion, RDMPStatus
 from supervisor.models.sample import Sample, SampleFieldValue
 from supervisor.models.storage import StorageRoot
 from supervisor.utils.security import hash_password
@@ -175,11 +175,14 @@ def seed_database():
         db.add(project1)
         db.flush()
 
-        # RDMP for project 1 (qPCR template)
+        # RDMP for project 1 (qPCR template) - activated immediately
         rdmp1 = RDMPVersion(
             project_id=project1.id,
             version_int=1,
             created_by=users[0].id,
+            approved_by=users[0].id,  # Alice approves
+            status=RDMPStatus.ACTIVE,
+            title="qPCR Standard RDMP",
             rdmp_json=templates[0][1],  # qPCR template
             provenance_json={
                 "template_id": templates[0][0].id,
@@ -215,11 +218,14 @@ def seed_database():
         db.add(project2)
         db.flush()
 
-        # RDMP for project 2 (RNA-seq template)
+        # RDMP for project 2 (RNA-seq template) - activated immediately
         rdmp2 = RDMPVersion(
             project_id=project2.id,
             version_int=1,
             created_by=users[2].id,
+            approved_by=users[0].id,  # Alice (PI) approves
+            status=RDMPStatus.ACTIVE,
+            title="RNA-seq Standard RDMP",
             rdmp_json=templates[1][1],  # RNA-seq template
             provenance_json={
                 "template_id": templates[1][0].id,
@@ -255,11 +261,14 @@ def seed_database():
         db.add(project3)
         db.flush()
 
-        # RDMP for project 3 (Microscopy template)
+        # RDMP for project 3 (Microscopy template) - activated immediately
         rdmp3 = RDMPVersion(
             project_id=project3.id,
             version_int=1,
             created_by=users[4].id,
+            approved_by=users[0].id,  # Alice (PI) approves
+            status=RDMPStatus.ACTIVE,
+            title="Microscopy Standard RDMP",
             rdmp_json=templates[2][1],  # Microscopy template
             provenance_json={
                 "template_id": templates[2][0].id,
@@ -435,7 +444,7 @@ def seed_database():
         print(f"  - RNA-seq Standard")
         print(f"  - Microscopy Standard")
         print(f"  - Clinical Samples")
-        print(f"\nProjects: 3 (each with storage root: LOCAL_DATA, owned by Demo Lab supervisor)")
+        print(f"\nProjects: 3 (each with storage root: LOCAL_DATA, owned by Demo Lab supervisor, ACTIVE RDMP)")
         print(f"  - Gene Expression Study 2024 (qPCR)")
         print(f"  - Transcriptomics Analysis (RNA-seq)")
         print(f"  - Cellular Imaging Core (Microscopy)")

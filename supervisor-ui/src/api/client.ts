@@ -1,4 +1,4 @@
-import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate } from '../types';
+import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -78,6 +78,35 @@ class ApiClient {
     return this.request<Supervisor[]>('/supervisors/');
   }
 
+  async getSupervisor(supervisorId: number): Promise<Supervisor> {
+    return this.request<Supervisor>(`/supervisors/${supervisorId}`);
+  }
+
+  // Supervisor Members
+  async getSupervisorMembers(supervisorId: number): Promise<SupervisorMember[]> {
+    return this.request<SupervisorMember[]>(`/supervisors/${supervisorId}/members`);
+  }
+
+  async addSupervisorMember(supervisorId: number, username: string, role: string): Promise<SupervisorMember> {
+    return this.request<SupervisorMember>(`/supervisors/${supervisorId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ username, role }),
+    });
+  }
+
+  async updateSupervisorMember(supervisorId: number, userId: number, role: string): Promise<SupervisorMember> {
+    return this.request<SupervisorMember>(`/supervisors/${supervisorId}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeSupervisorMember(supervisorId: number, userId: number): Promise<void> {
+    await this.request<void>(`/supervisors/${supervisorId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // RDMP
   async getProjectRDMP(projectId: number): Promise<RDMP> {
     return this.request<RDMP>(`/rdmp/projects/${projectId}/rdmp`);
@@ -100,8 +129,8 @@ class ApiClient {
   }
 
   // Samples
-  async getSamples(projectId: number): Promise<Sample[]> {
-    return this.request<Sample[]>(`/projects/${projectId}/samples`);
+  async getSamples(projectId: number, limit: number = 50, offset: number = 0): Promise<SampleListResponse> {
+    return this.request<SampleListResponse>(`/projects/${projectId}/samples?limit=${limit}&offset=${offset}`);
   }
 
   async getSample(sampleId: number): Promise<Sample> {

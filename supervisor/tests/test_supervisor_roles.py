@@ -457,7 +457,9 @@ class TestProjectAccessSupervisorScoped:
         response = client.get(f"/api/projects/{project_without_memberships.id}/samples", headers=headers)
 
         assert response.status_code == 200
-        assert response.json() == []  # Empty but accessible
+        data = response.json()
+        assert data["items"] == []  # Empty but accessible
+        assert data["total"] == 0
 
     def test_non_member_cannot_list_samples(self, client, users, supervisor, project_without_memberships):
         """Non-member cannot list samples."""
@@ -586,3 +588,113 @@ class TestCrossSupervisorIsolation:
         project_names = {p["name"] for p in data}
         assert "Second Lab Project" in project_names
         assert "First Lab Project" not in project_names
+
+
+class TestSupervisorMemberManagement:
+    """Test supervisor member management endpoints."""
+
+    def test_list_members(self, client, users, supervisor):
+        """Any member can list supervisor members."""
+        headers = get_auth_headers(client, "researcher_user")
+
+        response = client.get(f"/api/supervisors/{supervisor.id}/members", headers=headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        # Should have 3 members from the supervisor fixture
+        assert len(data) >= 3
+        usernames = {m["username"] for m in data}
+        assert "pi_user" in usernames
+        assert "steward_user" in usernames
+        assert "researcher_user" in usernames
+
+    def test_add_member_requires_steward_or_pi(self, client, users, supervisor):
+        """Adding members requires STEWARD or PI role."""
+        # Researcher cannot add members
+        headers = get_auth_headers(client, "researcher_user")
+        response = client.post(
+            f"/api/supervisors/{supervisor.id}/members",
+            json={"username": "non_member", "role": "RESEARCHER"},
+            headers=headers,
+        )
+        assert response.status_code == 403
+
+        # Steward can add members
+        headers = get_auth_headers(client, "steward_user")
+        response = client.post(
+            f"/api/supervisors/{supervisor.id}/members",
+            json={"username": "non_member", "role": "RESEARCHER"},
+            headers=headers,
+        )
+        assert response.status_code == 201
+        assert response.json()["username"] == "non_member"
+        assert response.json()["role"] == "RESEARCHER"
+
+    def test_update_member_role_requires_pi(self, client, users, supervisor):
+        """Updating member role requires PI role."""
+        # Steward cannot change roles
+        headers = get_auth_headers(client, "steward_user")
+        response = client.patch(
+            f"/api/supervisors/{supervisor.id}/members/{users['researcher_user'].id}",
+            json={"role": "STEWARD"},
+            headers=headers,
+        )
+        assert response.status_code == 403
+
+        # PI can change roles
+        headers = get_auth_headers(client, "pi_user")
+        response = client.patch(
+            f"/api/supervisors/{supervisor.id}/members/{users['researcher_user'].id}",
+            json={"role": "STEWARD"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["role"] == "STEWARD"
+
+    def test_remove_member_requires_pi(self, client, test_db, users, supervisor):
+        """Removing members requires PI role."""
+        # First add a member to remove
+        headers = get_auth_headers(client, "pi_user")
+        response = client.post(
+            f"/api/supervisors/{supervisor.id}/members",
+            json={"username": "non_member", "role": "RESEARCHER"},
+            headers=headers,
+        )
+        assert response.status_code == 201
+
+        # Steward cannot remove members
+        headers = get_auth_headers(client, "steward_user")
+        response = client.delete(
+            f"/api/supervisors/{supervisor.id}/members/{users['non_member'].id}",
+            headers=headers,
+        )
+        assert response.status_code == 403
+
+        # PI can remove members
+        headers = get_auth_headers(client, "pi_user")
+        response = client.delete(
+            f"/api/supervisors/{supervisor.id}/members/{users['non_member'].id}",
+            headers=headers,
+        )
+        assert response.status_code == 204
+
+    def test_cannot_remove_last_pi(self, client, users, supervisor):
+        """Cannot remove the last PI from a supervisor."""
+        headers = get_auth_headers(client, "pi_user")
+
+        # Try to remove the only PI
+        response = client.delete(
+            f"/api/supervisors/{supervisor.id}/members/{users['pi_user'].id}",
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        assert "last PI" in response.json()["detail"]
+
+    def test_non_member_cannot_list_members(self, client, users, supervisor):
+        """Non-member cannot list supervisor members."""
+        headers = get_auth_headers(client, "non_member")
+
+        response = client.get(f"/api/supervisors/{supervisor.id}/members", headers=headers)
+
+        assert response.status_code == 403

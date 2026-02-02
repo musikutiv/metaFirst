@@ -110,7 +110,9 @@ class TestAuthNoRedirect:
         )
 
         assert samples_response.status_code == 200
-        assert isinstance(samples_response.json(), list)
+        data = samples_response.json()
+        assert "items" in data  # Paginated response
+        assert isinstance(data["items"], list)
 
     def test_rdmp_endpoint_no_redirect(
         self, client, db, test_user, test_project, test_membership, test_rdmp

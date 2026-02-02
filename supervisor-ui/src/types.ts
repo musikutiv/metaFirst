@@ -169,3 +169,17 @@ export interface ProjectCreate {
   description?: string;
   supervisor_id: number;
 }
+
+export interface SupervisorMember {
+  user_id: number;
+  username: string;
+  display_name: string | null;
+  role: 'PI' | 'STEWARD' | 'RESEARCHER';
+}
+
+export interface SampleListResponse {
+  items: Sample[];
+  total: number;
+  limit: number;
+  offset: number;
+}

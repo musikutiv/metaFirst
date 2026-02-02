@@ -70,6 +70,7 @@ class SampleFieldValue(Base):
 
     __table_args__ = (
         UniqueConstraint("sample_id", "field_key", name="uq_sample_field"),
+        Index("ix_field_values_sample", "sample_id"),  # For eager loading
         Index("ix_field_values_search", "field_key", "value_text"),
     )
 

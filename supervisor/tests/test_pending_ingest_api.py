@@ -232,7 +232,7 @@ class TestPendingIngestAPI:
             f"/api/projects/{test_project.id}/samples",
             headers={"Authorization": f"Bearer {token}"},
         )
-        sample_ids = [s["sample_identifier"] for s in samples_response.json()]
+        sample_ids = [s["sample_identifier"] for s in samples_response.json()["items"]]
         assert "NEW-SAMPLE-001" in sample_ids
 
     def test_finalize_pending_ingest_link_existing_sample(

@@ -60,7 +60,7 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
         }
 
         // Fetch project-scoped data
-        const [rdmpData, activeRdmpData, samplesData, storageRootsData] = await Promise.all([
+        const [rdmpData, activeRdmpData, samplesResponse, storageRootsData] = await Promise.all([
           apiClient.getProjectRDMP(pendingIngest.project_id).catch(() => null),
           apiClient.getActiveRDMP(pendingIngest.project_id).catch(() => null),
           apiClient.getSamples(pendingIngest.project_id),
@@ -69,7 +69,7 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
 
         setRdmp(rdmpData);
         setActiveRDMP(activeRdmpData);
-        setSamples(samplesData);
+        setSamples(samplesResponse.items);
         setStorageRoots(storageRootsData);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load pending ingest');
