@@ -125,3 +125,33 @@ export interface PendingIngestFinalize {
   sample_identifier?: string;
   field_values?: Record<string, unknown>;
 }
+
+export interface RDMPVersion {
+  id: number;
+  project_id: number;
+  version: number;
+  status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED';
+  title: string;
+  content: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+  created_by: number | null;
+  approved_by: number | null;
+}
+
+export interface ProjectUpdate {
+  name?: string;
+  description?: string;
+  sample_id_rule_type?: string | null;
+  sample_id_regex?: string | null;
+}
+
+export interface RDMPCreate {
+  title: string;
+  content: Record<string, unknown>;
+}
+
+export interface RDMPUpdate {
+  title?: string;
+  content?: Record<string, unknown>;
+}

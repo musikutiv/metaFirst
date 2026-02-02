@@ -9,6 +9,8 @@ import { IngestInbox } from './components/IngestInbox';
 import { IngestForm } from './components/IngestForm';
 import { IngestPage } from './components/IngestPage';
 import { SampleDetailModal } from './components/SampleDetailModal';
+import { ProjectSettings } from './components/ProjectSettings';
+import { RDMPManagement } from './components/RDMPManagement';
 import type { User, Project, RDMP, Sample, RawDataItem, PendingIngest, StorageRoot } from './types';
 
 function App() {
@@ -165,6 +167,18 @@ function App() {
     }
   }, [selectedProjectId]);
 
+  // Callback for when project settings are updated
+  const handleProjectUpdated = useCallback((updatedProject: Project) => {
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+  }, []);
+
+  // Callback for when RDMP is activated - reload project data
+  const handleRDMPActivated = useCallback(() => {
+    if (selectedProjectId) {
+      loadProjectData(selectedProjectId);
+    }
+  }, [selectedProjectId]);
+
   // Show loading while checking auth
   if (authChecking) {
     return (
@@ -230,7 +244,13 @@ function App() {
   };
 
   // Determine current tab from route
-  const currentTab = location.pathname === '/inbox' ? 'inbox' : 'metadata';
+  const getCurrentTab = () => {
+    if (location.pathname === '/inbox') return 'inbox';
+    if (location.pathname === '/settings') return 'settings';
+    if (location.pathname === '/rdmps') return 'rdmps';
+    return 'metadata';
+  };
+  const currentTab = getCurrentTab();
 
   return (
     <div style={styles.app}>
@@ -300,6 +320,24 @@ function App() {
                       >
                         Ingest Inbox
                       </button>
+                      <button
+                        style={{
+                          ...styles.tab,
+                          ...(currentTab === 'rdmps' ? styles.tabActive : {}),
+                        }}
+                        onClick={() => navigate('/rdmps')}
+                      >
+                        RDMPs
+                      </button>
+                      <button
+                        style={{
+                          ...styles.tab,
+                          ...(currentTab === 'settings' ? styles.tabActive : {}),
+                        }}
+                        onClick={() => navigate('/settings')}
+                      >
+                        Settings
+                      </button>
                     </div>
                   </div>
                 )}
@@ -307,6 +345,36 @@ function App() {
                 <Routes>
                   <Route path="/" element={renderProjectContent('metadata')} />
                   <Route path="/inbox" element={renderProjectContent('inbox')} />
+                  <Route
+                    path="/settings"
+                    element={
+                      selectedProject ? (
+                        <ProjectSettings
+                          project={selectedProject}
+                          onProjectUpdated={handleProjectUpdated}
+                        />
+                      ) : (
+                        <div style={styles.placeholder}>
+                          <p>Select a project to view its settings</p>
+                        </div>
+                      )
+                    }
+                  />
+                  <Route
+                    path="/rdmps"
+                    element={
+                      selectedProject ? (
+                        <RDMPManagement
+                          project={selectedProject}
+                          onRDMPActivated={handleRDMPActivated}
+                        />
+                      ) : (
+                        <div style={styles.placeholder}>
+                          <p>Select a project to manage RDMPs</p>
+                        </div>
+                      )
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </>

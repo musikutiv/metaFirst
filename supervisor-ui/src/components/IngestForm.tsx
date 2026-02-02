@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { apiClient } from '../api/client';
-import type { PendingIngest, RDMPField, Sample, StorageRoot, Project } from '../types';
+import type { PendingIngest, RDMPField, Sample, StorageRoot } from '../types';
 
 interface IngestFormProps {
   ingest: PendingIngest;
   fields: RDMPField[];
   samples: Sample[];
   storageRoots: StorageRoot[];
-  project: Project;
   onComplete: () => void;
   onCancel: () => void;
 }
@@ -17,7 +16,6 @@ export function IngestForm({
   fields,
   samples,
   storageRoots,
-  project,
   onComplete,
   onCancel,
 }: IngestFormProps) {
