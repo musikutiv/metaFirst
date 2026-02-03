@@ -1,11 +1,11 @@
 # metaFirst Ingest Helper
 
-A watchdog-based tool that monitors folders on user machines and creates pending ingests in the metaFirst supervisor for browser-based metadata entry.
+A watchdog-based tool that monitors folders on user machines and creates pending ingests in the metaFirst server for browser-based metadata entry.
 
 ## Overview
 
 The Ingest Helper watches specified folders for new files. When a file is detected:
-1. It creates a "pending ingest" record in the supervisor
+1. It creates a "pending ingest" record in the server
 2. Optionally opens your browser to complete metadata entry
 3. The file is then fully registered with project and sample associations
 
@@ -37,7 +37,8 @@ ui_url: http://localhost:5173
 open_browser: true
 compute_hash: false
 
-# Supervisor binding (required if multiple supervisors exist)
+# Lab binding (required if multiple labs exist)
+# Note: Config uses supervisor_id for backward compatibility
 supervisor_id: 1
 
 watchers:
@@ -46,31 +47,31 @@ watchers:
     storage_root_id: 1
 ```
 
-**Note:** The supervisor must be started with `--host 0.0.0.0` for ingest helpers running on other machines to connect.
+**Note:** The server must be started with `--host 0.0.0.0` for ingest helpers running on other machines to connect.
 
-## Supervisor Scoping (v0.2+)
+## Lab Scoping (v0.2+)
 
-Each ingestor instance is bound to **exactly one supervisor**. This ensures operational isolation between different supervisors (labs, departments, etc.).
+Each ingestor instance is bound to **exactly one lab**. This ensures operational isolation between different labs.
 
 ### How It Works
 
-- If `supervisor_id` is specified in config, that supervisor is used
-- If omitted and exactly one supervisor exists, auto-binds to it
-- If omitted and multiple supervisors exist, fails with a clear error listing available supervisors
+- If `supervisor_id` (or `lab_id`) is specified in config, that lab is used
+- If omitted and exactly one lab exists, auto-binds to it
+- If omitted and multiple labs exist, fails with a clear error listing available labs
 
-### Cross-Supervisor Rejection
+### Cross-Lab Rejection
 
-When a file is detected, the ingestor validates that the project belongs to its configured supervisor. If mismatched:
+When a file is detected, the ingestor validates that the project belongs to its configured lab. If mismatched:
 
 ```
 [NEW FILE] /data/qpcr/sample.fastq
-  [REJECT] Project 5 belongs to supervisor 2 but this ingestor is configured
-           for supervisor 1. Start a separate ingestor instance for supervisor 2.
+  [REJECT] Project 5 belongs to lab 2 but this ingestor is configured
+           for lab 1. Start a separate ingestor instance for lab 2.
 ```
 
 ### Running Multiple Ingestors
 
-To ingest data for projects across multiple supervisors, run separate ingestor instances:
+To ingest data for projects across multiple labs, run separate ingestor instances:
 
 ```bash
 # Terminal 1: Ingestor for Lab A (supervisor_id: 1)
@@ -156,8 +157,8 @@ The helper prints resolved mappings at startup:
 metaFirst Ingest Helper
 ============================================================
 Config file: config.yaml
-Connected to supervisor at http://localhost:8000
-Bound to supervisor: Demo Lab (id=1)
+Connected to server at http://localhost:8000
+Bound to lab: Demo Lab (id=1)
 UI URL: http://localhost:5173
 Auto-open browser: true
 ------------------------------------------------------------
@@ -183,7 +184,7 @@ python metafirst_ingest.py config.yaml
 ```
 
 The helper will:
-1. Connect to the supervisor and authenticate
+1. Connect to the server and authenticate
 2. Resolve any name-based configurations
 3. Start watching configured folders
 4. Create pending ingests when new files appear
@@ -222,8 +223,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/projects/1/stor
 | `Storage root not found: 'X'` | Storage root doesn't exist in the project | Verify storage root name in project |
 | `Ambiguous project_name` | Multiple projects match (shouldn't happen) | Contact admin |
 | `Authentication failed` | Invalid credentials | Check username/password |
-| `Multiple supervisors found` | No supervisor_id in config, multiple exist | Add `supervisor_id: N` to config |
-| `Project belongs to supervisor X` | Project's supervisor differs from ingestor's | Use separate config/instance for that supervisor |
+| `Multiple labs found` | No lab_id in config, multiple exist | Add `supervisor_id: N` (or `lab_id: N`) to config |
+| `Project belongs to lab X` | Project's lab differs from ingestor's | Use separate config/instance for that lab |
 
 ## Sample Identifier Extraction
 

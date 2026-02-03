@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.4.0 — Lab Terminology (WIP)
+
+**Status:** In development
+
+**Summary:** Terminology migration: Supervisor → Lab (backward compatible)
+
+- All user-facing text now uses "Lab" instead of "Supervisor"
+- Documentation updated to use "Lab" terminology
+- API endpoints, config keys, and CLI flags remain unchanged for backward compatibility
+- Legacy `supervisor*` inputs continue to work with deprecation warnings
+
+---
+
 ## v0.3.1 — Project Lifecycle and Governance UI
 
 **Release date:** 2026-02-02
@@ -9,9 +22,9 @@ Completes the project lifecycle and governance UI. See [RELEASE_NOTES_v0.3.1.md]
 **Highlights:**
 - Create Project wizard with RDMP setup
 - Project Settings and RDMP Management pages
-- Supervisor member management UI
+- Lab member management UI
 - Projects Overview dashboard
-- Supervisor-scoped project visibility and access
+- Lab-scoped project visibility and access
 - Sample ID extraction rules with detection panel
 - Paginated samples API with performance improvements
 - Demo seed creates operational projects with ACTIVE RDMPs

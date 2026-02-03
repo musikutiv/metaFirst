@@ -56,7 +56,7 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
         setSupervisorId(data[0].id);
       }
     } catch (e) {
-      setError('Failed to load supervisors');
+      setError('Failed to load labs');
     } finally {
       setLoadingSupervisors(false);
     }
@@ -65,7 +65,7 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supervisorId) {
-      setError('Please select a supervisor');
+      setError('Please select a lab');
       return;
     }
 
@@ -180,18 +180,18 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
       </p>
 
       {loadingSupervisors ? (
-        <div style={styles.loading}>Loading supervisors...</div>
+        <div style={styles.loading}>Loading labs...</div>
       ) : (
         <>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Supervisor *</label>
+            <label style={styles.label}>Lab *</label>
             <select
               style={styles.select}
               value={supervisorId || ''}
               onChange={(e) => setSupervisorId(e.target.value ? Number(e.target.value) : null)}
               required
             >
-              <option value="">-- Select Supervisor --</option>
+              <option value="">-- Select Lab --</option>
               {supervisors.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}

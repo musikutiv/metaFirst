@@ -14,13 +14,13 @@ Licensed under the [MIT License](LICENSE).
 
 ## Concepts
 
-### Supervisors and Projects
+### Labs and Projects
 
-A **supervisor** represents a research group or organizational unit (e.g., a PI's lab). Projects belong to supervisors.
+A **lab** represents a research group or organizational unit (e.g., a PI's lab). Projects belong to labs.
 
-- Users are members of supervisors with roles: **PI**, **STEWARD**, or **RESEARCHER**
-- Project visibility is supervisor-scoped: users only see projects from their supervisors
-- PIs can create projects and manage supervisor membership
+- Users are members of labs with roles: **PI**, **STEWARD**, or **RESEARCHER**
+- Project visibility is lab-scoped: users only see projects from their labs
+- PIs can create projects and manage lab membership
 - STEWARDs can create projects and manage operational state
 - RESEARCHERs can trigger ingests and access project data
 
@@ -55,7 +55,7 @@ Active proof-of-principle. Core functionality is implemented; some features (rel
 
 Install scripts automate setup on macOS/Linux. Run from the repository root.
 
-### Supervisor (group leader / lab admin)
+### Server Setup (group leader / lab admin)
 
 ```bash
 ./scripts/install_supervisor.sh
@@ -71,7 +71,7 @@ Requirements: Python 3.11+. Node.js 18+ is required only for the web UI (backend
 ./scripts/install_user.sh
 ```
 
-Sets up Python venv for the ingest helper and creates `config.yaml` from the example if missing. Edit `config.yaml` with your supervisor URL, credentials, and watch paths before running.
+Sets up Python venv for the ingest helper and creates `config.yaml` from the example if missing. Edit `config.yaml` with your server URL, credentials, and watch paths before running.
 
 The ingest helper is optional. Raw data stays on your machine.
 
@@ -80,7 +80,7 @@ The ingest helper is optional. Raw data stays on your machine.
 After installation, start the services:
 
 ```bash
-# Supervisor backend (terminal 1)
+# Backend server (terminal 1)
 cd supervisor && source venv/bin/activate
 uvicorn supervisor.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -137,7 +137,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Common Pitfalls
 
 - **Python too old** — Install scripts require Python 3.11+. Use `PYTHON_BIN=/path/to/python3.12` to override.
-- **Supervisor not reachable** — Start uvicorn with `--host 0.0.0.0` for remote access; check firewall on port 8000.
+- **Server not reachable** — Start uvicorn with `--host 0.0.0.0` for remote access; check firewall on port 8000.
 - **Web UI "host not allowed"** — Set `VITE_ALLOWED_HOSTS` to the hostname clients use, or use `./scripts/start_ui_remote.sh`.
 - **Login fails (401)** — Check DB exists at `supervisor/supervisor.db`; run `./scripts/install_supervisor.sh --seed` to reseed.
 - **Multiple DB files** — The canonical DB is `supervisor/supervisor.db`. Delete any stale `./supervisor.db` in repo root.

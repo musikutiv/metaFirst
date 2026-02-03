@@ -6,16 +6,16 @@ This document describes the system design, components, and interaction flows of 
 
 metaFirst implements a **metadata-first** approach to research data management:
 
-- **Metadata is centralized**: A single supervisor service stores and manages all project metadata, sample records, and field values.
+- **Metadata is centralized**: A single backend service stores and manages all project metadata, sample records, and field values.
 - **Raw data is decentralized**: Files remain on user machines or lab storage. The system tracks file locations via storage roots and relative paths but never moves, copies, or accesses raw data.
 - **RDMPs are authoritative**: Research Data Management Plans define required fields, roles, permissions, and visibility policies. All enforcement derives from the active RDMP.
 - **Federation is metadata-only**: Cross-project discovery operates on indexed metadata. Raw data locations are never exposed to the discovery layer.
 
 ## Components
 
-### Supervisor Service
+### Backend Service
 
-The central backend service (FastAPI + SQLite).
+The central backend service (FastAPI + SQLite). Located in `supervisor/` directory.
 
 **Responsibilities:**
 - Store and serve project metadata, samples, and field values
@@ -33,9 +33,9 @@ The central backend service (FastAPI + SQLite).
 - `/api/storage-roots`, `/api/raw-data` — storage root mappings and raw data references
 - `/api/discovery` — federated metadata search (API-only)
 
-### Supervisor UI
+### Web UI
 
-A React + Vite frontend for project management and metadata entry.
+A React + Vite frontend for project management and metadata entry. Located in `supervisor-ui/` directory.
 
 **Capabilities:**
 - Projects Overview: Dashboard of all accessible projects with RDMP status
@@ -44,7 +44,7 @@ A React + Vite frontend for project management and metadata entry.
 - RDMP Management: View versions, activate drafts (PI only)
 - Sample Table: RDMP-driven dynamic columns with completeness indicators
 - Pending Ingest: Browser-based metadata entry with sample ID detection
-- Member Management: Add/remove supervisor members, change roles (PI only)
+- Member Management: Add/remove lab members, change roles (PI only)
 
 ### User Machines and Ingest Helper
 
@@ -52,13 +52,13 @@ Raw data files reside on user machines (workstations, lab servers, NAS). The sys
 
 **Ingest Helper** is a Python tool that runs locally on user machines:
 - Watches configured folders for new files (using watchdog)
-- Creates pending ingest records in the supervisor when files appear
+- Creates pending ingest records in the server when files appear
 - Optionally opens the browser for metadata entry
 - Resolves project/storage root by name or ID
 
 The ingest helper is a convenience tool, not a required component. Users can also register files via direct API calls.
 
-**Supervisor Scoping (v0.2+)**: Each ingestor instance is bound to exactly one supervisor. Projects from other supervisors are rejected at ingest time. To ingest for multiple supervisors, run separate ingestor instances with different configs.
+**Lab Scoping (v0.2+)**: Each ingestor instance is bound to exactly one lab. Projects from other labs are rejected at ingest time. To ingest for multiple labs, run separate ingestor instances with different configs.
 
 ### Storage Roots
 
@@ -77,14 +77,14 @@ This indirection allows the same logical file reference to resolve to different 
 A metadata-only search index for cross-project discovery.
 
 **Current implementation:**
-- Embedded within the supervisor as a separate SQLite database (`discovery.db`)
+- Embedded within the backend as a separate SQLite database (`discovery.db`)
 - Push API accepts metadata records with visibility levels (PUBLIC, REGISTERED, PRIVATE)
 - Search API returns matching records respecting visibility policies
 - No web UI yet (API-only by design for validation phase)
 
 **Design intent:**
 - Can be extracted to a standalone service later
-- Multiple supervisor instances can push to a shared discovery index
+- Multiple server instances can push to a shared discovery index
 - Raw data is never indexed or accessible via discovery
 
 ## Interaction Flows
@@ -94,9 +94,9 @@ A metadata-only search index for cross-project discovery.
 1. User drops a file into a watched folder on their machine
 2. Ingest helper detects the file and computes its relative path from the storage root
 3. Ingest helper calls `POST /api/projects/{id}/pending-ingests` with file metadata
-4. Supervisor creates a pending ingest record
+4. Server creates a pending ingest record
 5. User completes metadata entry via browser (or API)
-6. Supervisor finalizes the ingest, creating a raw data item linked to a sample
+6. Server finalizes the ingest, creating a raw data item linked to a sample
 
 ### Local Metadata Management
 
@@ -108,7 +108,7 @@ A metadata-only search index for cross-project discovery.
 
 ### Federated Discovery
 
-1. Supervisor (or CLI tool) pushes sample metadata to `/api/discovery/push` with visibility level
+1. Server (or CLI tool) pushes sample metadata to `/api/discovery/push` with visibility level
 2. Discovery index stores metadata with origin tracking (origin, project_id, sample_id)
 3. External users search via `/api/discovery/search?q=...&visibility=PUBLIC`
 4. Search results include provenance (origin, IDs) for tracing back to source
@@ -118,7 +118,7 @@ A metadata-only search index for cross-project discovery.
 
 ### No Central Control Over Data or Machines
 
-The supervisor manages metadata only. It has no access to user machines, cannot read raw data files, and does not control where data is stored. Users retain full ownership of their data.
+The server manages metadata only. It has no access to user machines, cannot read raw data files, and does not control where data is stored. Users retain full ownership of their data.
 
 ### RDMP-Guided Metadata Enforcement
 
@@ -134,8 +134,8 @@ Changing an RDMP creates a new version. Old samples remain valid; new requiremen
 Cross-project discovery operates entirely on metadata:
 - Only metadata marked with appropriate visibility is indexed
 - Raw data locations are not exposed to discovery
-- Discovery results link back to originating supervisors for data access
-- No central authority controls what gets indexed; each supervisor decides what to push
+- Discovery results link back to originating labs for data access
+- No central authority controls what gets indexed; each lab decides what to push
 
 ### API-First Architecture
 
@@ -152,14 +152,14 @@ All functionality is exposed via REST APIs:
 | Entity | Purpose |
 |--------|---------|
 | User | Authentication and identity |
-| Supervisor | Organizational unit (lab, research group) |
-| SupervisorMembership | Links users to supervisors with roles (PI/STEWARD/RESEARCHER) |
-| Project | Container for samples and RDMPs; belongs to a supervisor |
+| Supervisor | Lab (organizational unit, research group). Called "Lab" in UI. |
+| SupervisorMembership | Links users to labs with roles (PI/STEWARD/RESEARCHER) |
+| Project | Container for samples and RDMPs; belongs to a lab |
 | RDMPVersion | Versioned RDMP definitions per project |
 | Sample | Individual sample records within a project |
 | SampleFieldValue | EAV-style field values for samples |
 
-**Note:** Legacy `Membership` (project-level) is deprecated. Authorization is now supervisor-scoped via `SupervisorMembership`.
+**Note:** Legacy `Membership` (project-level) is deprecated. Authorization is now lab-scoped via `SupervisorMembership`.
 
 ### Storage Entities
 
@@ -180,27 +180,27 @@ All functionality is exposed via REST APIs:
 
 | Entity | Purpose | Database |
 |--------|---------|----------|
-| Supervisor | Tenant/organization unit | Central |
-| SupervisorMembership | Links users to supervisors with roles | Central |
+| Supervisor | Lab (tenant/organization unit) | Central |
+| SupervisorMembership | Links users to labs with roles | Central |
 | IngestRunRecord | Ingest run provenance with RDMP link | Central |
-| IngestRun | Record of ingest operations | Per-supervisor |
-| Heartbeat | Ingestor health status | Per-supervisor |
+| IngestRun | Record of ingest operations | Per-lab |
+| Heartbeat | Ingestor health status | Per-lab |
 
 ## Authorization (v0.2+)
 
 metaFirst uses a two-level authorization model:
 
-### Supervisor-Level Roles
+### Lab-Level Roles
 
-Users are assigned one of three roles per supervisor via `SupervisorMembership`:
+Users are assigned one of three roles per lab via `SupervisorMembership`:
 
 | Role | Description | Permissions |
 |------|-------------|-------------|
-| **PI** | Principal Investigator | Full authority. Can update supervisor config, create projects, trigger ingest runs, assign primary steward, manage all roles. |
-| **STEWARD** | Data Steward | Operational responsibility. Can update supervisor config, create projects, trigger ingest runs, manage operational state. |
-| **RESEARCHER** | Researcher | Can trigger ingest runs, access supervisor resources. Cannot create projects or modify supervisor config. |
+| **PI** | Principal Investigator | Full authority. Can update lab config, create projects, trigger ingest runs, assign primary steward, manage all roles. |
+| **STEWARD** | Data Steward | Operational responsibility. Can update lab config, create projects, trigger ingest runs, manage operational state. |
+| **RESEARCHER** | Researcher | Can trigger ingest runs, access lab resources. Cannot create projects or modify lab config. |
 
-Each supervisor has exactly one **primary steward** (`primary_steward_user_id`), typically assigned the PI role. The primary steward has ultimate responsibility for data governance.
+Each lab has exactly one **primary steward** (`primary_steward_user_id`), typically assigned the PI role. The primary steward has ultimate responsibility for data governance.
 
 ### Project-Level Roles
 
@@ -210,23 +210,25 @@ Within projects, roles are defined by RDMPs and managed via `Membership`:
 
 ### Authorization Flow
 
-1. **Supervisor operations** (update supervisor config) check supervisor memberships
+1. **Lab operations** (update lab config) check lab memberships
 2. **Project operations** (create samples, edit fields) check project memberships
-3. **Creating projects** requires STEWARD or PI role at supervisor level
-4. **Triggering ingest runs** requires RESEARCHER, STEWARD, or PI role at supervisor level
-5. **Updating supervisor config** requires STEWARD or PI role
+3. **Creating projects** requires STEWARD or PI role at lab level
+4. **Triggering ingest runs** requires RESEARCHER, STEWARD, or PI role at lab level
+5. **Updating lab config** requires STEWARD or PI role
 
 ### Authorization Helpers
 
 The API uses helper functions in `supervisor/api/deps.py`:
 
 ```python
-# Check user has any role for a supervisor
+# Check user has any role for a lab
 require_any_supervisor_role(db, user, supervisor_id)
 
 # Check user has specific roles
 require_supervisor_role(db, user, supervisor_id, [SupervisorRole.PI, SupervisorRole.STEWARD])
 ```
+
+Note: Internal code uses `supervisor` naming for backward compatibility; UI displays "Lab".
 
 ## Project-Only RDMPs (v0.2+)
 
@@ -285,7 +287,7 @@ metaFirst uses a two-tier database architecture:
 
 Stores core metadata shared across the system:
 - Users, authentication, memberships
-- Supervisors and their configuration
+- Labs and their configuration
 - Projects, samples, field values
 - Storage roots and raw data references
 - RDMPs and templates
@@ -293,9 +295,9 @@ Stores core metadata shared across the system:
 
 Location: `supervisor/supervisor.db` (SQLite)
 
-### Per-Supervisor Operational Databases
+### Per-Lab Operational Databases
 
-Each supervisor has its own operational database for runtime state:
+Each lab has its own operational database for runtime state:
 - Ingest run history (start/end times, file counts, errors)
 - Ingestor heartbeats (health status, last seen)
 - Log pointers (future: links to detailed log files)
@@ -306,24 +308,26 @@ Location: Configured via `supervisor.supervisor_db_dsn`
 
 ### Why Separate Databases?
 
-1. **Operational isolation**: One supervisor's runtime state doesn't affect another
+1. **Operational isolation**: One lab's runtime state doesn't affect another
 2. **Scalability**: High-frequency operational writes don't compete with metadata reads
-3. **Security**: Operational access can be restricted per-supervisor
+3. **Security**: Operational access can be restricted per-lab
 4. **Maintenance**: Operational DBs can be cleared/archived independently
 
 ### CLI Commands
 
 ```bash
-# List all supervisors and their operational DB status
+# List all labs and their operational DB status
 python -m supervisor.cli supervisor-db list
 
-# Check status of a supervisor's operational DB
+# Check status of a lab's operational DB
 python -m supervisor.cli supervisor-db status --supervisor 1
 
-# Initialize a supervisor's operational DB
+# Initialize a lab's operational DB
 python -m supervisor.cli supervisor-db init --supervisor 1
 python -m supervisor.cli supervisor-db init --supervisor 1 --dsn "postgresql://user:pass@host/db"
 ```
+
+Note: CLI uses `--supervisor` flag for backward compatibility.
 
 ### API Endpoints
 
@@ -367,8 +371,8 @@ metaFirst/
 ### Implemented
 
 - JWT authentication and authorization
-- Supervisor-scoped authorization (PI, STEWARD, RESEARCHER roles)
-- Project management with supervisor-scoped visibility
+- Lab-scoped authorization (PI, STEWARD, RESEARCHER roles)
+- Project management with lab-scoped visibility
 - RDMP lifecycle (DRAFT → ACTIVE → SUPERSEDED) with PI approval
 - Sample and field value CRUD with RDMP validation
 - Paginated samples API with eager loading
@@ -378,10 +382,10 @@ metaFirst/
 - Sample ID extraction rules with detection panel
 - Create Project wizard with RDMP setup
 - Project Settings and RDMP Management UI
-- Supervisor member management UI
+- Lab member management UI
 - Projects Overview dashboard
 - Federated discovery index (API-only)
-- Per-supervisor operational databases (ingest runs, heartbeats)
+- Per-lab operational databases (ingest runs, heartbeats)
 
 ### Planned
 

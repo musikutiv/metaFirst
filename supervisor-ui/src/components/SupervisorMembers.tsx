@@ -77,7 +77,7 @@ export function SupervisorMembers() {
 
   const handleRemoveMember = async (userId: number, username: string) => {
     if (!supervisorId) return;
-    if (!confirm(`Remove ${username} from this supervisor?`)) return;
+    if (!confirm(`Remove ${username} from this lab?`)) return;
 
     setError(null);
     try {
@@ -109,7 +109,7 @@ export function SupervisorMembers() {
   if (!supervisor) {
     return (
       <div style={styles.container}>
-        <p style={styles.error}>Supervisor not found</p>
+        <p style={styles.error}>Lab not found</p>
         <button style={styles.backButton} onClick={() => navigate('/')}>
           Back to Projects
         </button>
@@ -125,7 +125,7 @@ export function SupervisorMembers() {
         </button>
         <div>
           <h2 style={styles.title}>{supervisor.name}</h2>
-          <p style={styles.subtitle}>Manage supervisor members</p>
+          <p style={styles.subtitle}>Manage lab members</p>
         </div>
       </div>
 

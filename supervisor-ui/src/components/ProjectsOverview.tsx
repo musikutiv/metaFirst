@@ -151,7 +151,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
 
               <div style={styles.cardDetails}>
                 <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Supervisor:</span>
+                  <span style={styles.detailLabel}>Lab:</span>
                   <span style={styles.detailValue}>
                     {project.supervisorName || 'Unknown'}
                     <button

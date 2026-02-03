@@ -1,32 +1,32 @@
-# metaFirst Supervisor
+# metaFirst Backend
 
 A metadata-first Research Data Management (RDM) system with multi-tenant architecture, policy-driven data governance, and federated discovery.
 
 ## Overview
 
-metaFirst Supervisor provides:
-- **Multi-tenant isolation**: Each supervisor (lab/group) operates independently with its own operational database
+metaFirst backend provides:
+- **Multi-tenant isolation**: Each lab operates independently with its own operational database
 - **Role-based access control**: Researcher, Steward, and PI roles with granular permissions
 - **RDMP-driven governance**: Research Data Management Plans define metadata schemas, retention policies, and visibility rules
-- **Federated discovery**: Cross-supervisor metadata search with visibility-based access control
+- **Federated discovery**: Cross-lab metadata search with visibility-based access control
 - **Soft enforcement**: Policy compliance monitoring with remediation task workflows
 
 ## Architecture
 
 ### Tenant Model
 
-A **Supervisor** represents a tenant boundary (e.g., a research lab or group):
-- Each supervisor has its own operational database for isolated state (runs, heartbeats, logs)
-- Projects belong to exactly one supervisor
-- Users can be members of multiple supervisors with different roles
+A **Lab** represents a tenant boundary (e.g., a research lab or group). Internally called "Supervisor" for backward compatibility.
+- Each lab has its own operational database for isolated state (runs, heartbeats, logs)
+- Projects belong to exactly one lab
+- Users can be members of multiple labs with different roles
 
 ### Roles
 
 | Role | Scope | Capabilities |
 |------|-------|--------------|
-| **Researcher** | Supervisor | View projects, edit metadata, run ingests |
-| **Steward** | Supervisor | All Researcher permissions + manage RDMPs, set visibility, approve remediation tasks |
-| **PI** | Supervisor | All Steward permissions + create projects, manage supervisor settings |
+| **Researcher** | Lab | View projects, edit metadata, run ingests |
+| **Steward** | Lab | All Researcher permissions + manage RDMPs, set visibility, approve remediation tasks |
+| **PI** | Lab | All Steward permissions + create projects, manage lab settings |
 
 ### RDMPs (Research Data Management Plans)
 
@@ -47,7 +47,7 @@ Samples have a visibility level controlling discovery access:
 
 | Level | Description | Who Can See |
 |-------|-------------|-------------|
-| **PRIVATE** | Restricted to supervisor members | Only members of the owning supervisor |
+| **PRIVATE** | Restricted to lab members | Only members of the owning lab |
 | **INSTITUTION** | Visible to authenticated users | Any authenticated user |
 | **PUBLIC** | Open access | Anyone (no authentication required) |
 
@@ -85,17 +85,19 @@ curl -X PATCH "http://localhost:8000/api/samples/123/visibility" \
 # Dry run - report issues without creating tasks
 python -m supervisor.cli.remediation run --dry-run
 
-# Dry run for a specific supervisor
+# Dry run for a specific lab
 python -m supervisor.cli.remediation run --dry-run --supervisor 1
 
 # Create tasks for detected issues
 python -m supervisor.cli.remediation run --supervisor 1
+
+# Note: CLI uses --supervisor flag for backward compatibility
 ```
 
 ### Remediation Task API
 
 ```bash
-# List tasks for a supervisor (Steward/PI only)
+# List tasks for a lab (Steward/PI only)
 curl "http://localhost:8000/api/remediation/tasks?supervisor_id=1" \
   -H "Authorization: Bearer $TOKEN"
 
@@ -122,10 +124,10 @@ curl -X POST "http://localhost:8000/api/remediation/tasks/1/execute" \
 - `POST /api/auth/login` - Get JWT token
 - `GET /api/auth/me` - Get current user info
 
-### Supervisors
-- `GET /api/supervisors` - List supervisors
-- `POST /api/supervisors` - Create supervisor (admin)
-- `PATCH /api/supervisors/{id}` - Update supervisor (Steward/PI)
+### Labs
+- `GET /api/supervisors` - List labs (endpoint uses `supervisors` for backward compatibility)
+- `POST /api/supervisors` - Create lab (admin)
+- `PATCH /api/supervisors/{id}` - Update lab (Steward/PI)
 
 ### Projects
 - `GET /api/projects` - List projects
@@ -183,7 +185,8 @@ uvicorn supervisor.main:app --reload
 ## Version History
 
 - **v0.3.0**: Metadata visibility (PRIVATE/INSTITUTION/PUBLIC), remediation tasks with soft enforcement
-- **v0.2.0**: Multi-tenant architecture, supervisor-scoped roles, project-only RDMPs with activation workflow
+- **v0.4.0**: Terminology migration: Supervisor → Lab (backward compatible)
+- **v0.2.0**: Multi-tenant architecture, lab-scoped roles, project-only RDMPs with activation workflow
 - **v0.1.0**: Foundational proof of principle
 
 ## License
