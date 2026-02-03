@@ -28,6 +28,14 @@ logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s] %(message)s",
 )
+
+# Deprecation warnings for v0.4 terminology migration
+def _emit_deprecation_warning(old_key: str, new_key: str) -> None:
+    """Emit deprecation warning when legacy config key is used."""
+    logging.warning(
+        f"Config key '{old_key}' is deprecated. Use '{new_key}' instead. "
+        f"'{old_key}' will continue to work for backward compatibility."
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -281,66 +289,92 @@ class SupervisorClient:
         return self._request("GET", f"/api/projects/{project_id}")
 
 
-class SupervisorMismatchError(Exception):
-    """Raised when a project belongs to a different supervisor than configured."""
+class LabMismatchError(Exception):
+    """Raised when a project belongs to a different lab than configured."""
 
-    def __init__(self, project_id: int, project_supervisor_id: int, configured_supervisor_id: int):
+    def __init__(
+        self,
+        project_id: int,
+        project_lab_id: int | None = None,
+        configured_lab_id: int | None = None,
+        # Backward-compatible parameter names
+        project_supervisor_id: int | None = None,
+        configured_supervisor_id: int | None = None,
+    ):
         self.project_id = project_id
-        self.project_supervisor_id = project_supervisor_id
-        self.configured_supervisor_id = configured_supervisor_id
+        # Accept either new or old parameter names
+        self.project_lab_id = project_lab_id if project_lab_id is not None else project_supervisor_id
+        self.configured_lab_id = configured_lab_id if configured_lab_id is not None else configured_supervisor_id
+        # Keep backward-compatible attributes
+        self.project_supervisor_id = self.project_lab_id
+        self.configured_supervisor_id = self.configured_lab_id
         super().__init__(
-            f"Project {project_id} belongs to supervisor {project_supervisor_id} "
-            f"but this ingestor is configured for supervisor {configured_supervisor_id}. "
-            f"Start a separate ingestor instance for supervisor {project_supervisor_id}."
+            f"Project {project_id} belongs to lab {self.project_lab_id} "
+            f"but this ingestor is configured for lab {self.configured_lab_id}. "
+            f"Start a separate ingestor instance for lab {self.project_lab_id}."
         )
 
 
-def resolve_supervisor_id(
+# Backward compatibility alias
+SupervisorMismatchError = LabMismatchError
+
+
+def resolve_lab_id(
     config: dict,
     client: SupervisorClient,
 ) -> tuple[int, str | None]:
-    """Resolve the supervisor_id from config or auto-detect.
+    """Resolve the lab_id from config or auto-detect.
 
     Resolution rules:
-    1. If supervisor_id is explicitly provided in config, use it.
-    2. If not provided, fetch supervisors from API:
-       - If exactly 1 supervisor exists, auto-bind to it.
-       - If 0 or >1 supervisors, fail with clear error.
+    1. If lab_id is explicitly provided in config, use it (preferred).
+    2. If supervisor_id is provided (deprecated), use it with warning.
+    3. If not provided, fetch labs from API:
+       - If exactly 1 lab exists, auto-bind to it.
+       - If 0 or >1 labs, fail with clear error.
 
     Args:
         config: Config dict from YAML
         client: SupervisorClient for API calls
 
     Returns:
-        Tuple of (supervisor_id, None) on success, or
+        Tuple of (lab_id, None) on success, or
         (0, error_message) on failure.
     """
-    # Check for explicit supervisor_id in config
+    # Check for explicit lab_id (preferred)
+    if "lab_id" in config and config["lab_id"] is not None:
+        return int(config["lab_id"]), None
+
+    # Check for deprecated supervisor_id
     if "supervisor_id" in config and config["supervisor_id"] is not None:
+        _emit_deprecation_warning("supervisor_id", "lab_id")
         return int(config["supervisor_id"]), None
 
-    # Auto-detect: fetch supervisors
+    # Auto-detect: fetch labs
     try:
-        supervisors = client.get_supervisors()
+        labs = client.get_supervisors()
     except Exception as e:
-        return 0, f"Failed to fetch supervisors for auto-detection: {e}"
+        return 0, f"Failed to fetch labs for auto-detection: {e}"
 
-    if len(supervisors) == 0:
-        return 0, "No supervisors found. Create a supervisor first."
+    if len(labs) == 0:
+        return 0, "No labs found. Create a lab first."
 
-    if len(supervisors) == 1:
-        supervisor = supervisors[0]
+    if len(labs) == 1:
+        lab = labs[0]
         logger.info(
-            f"Auto-detected single supervisor: {supervisor['name']} (id={supervisor['id']})"
+            f"Auto-detected single lab: {lab['name']} (id={lab['id']})"
         )
-        return supervisor["id"], None
+        return lab["id"], None
 
-    # Multiple supervisors - require explicit config
-    supervisor_names = [f"  - {s['name']} (id={s['id']})" for s in supervisors]
+    # Multiple labs - require explicit config
+    lab_names = [f"  - {s['name']} (id={s['id']})" for s in labs]
     return 0, (
-        f"Multiple supervisors found. Add 'supervisor_id' to config:\n"
-        + "\n".join(supervisor_names)
+        f"Multiple labs found. Add 'lab_id' to config:\n"
+        + "\n".join(lab_names)
     )
+
+
+# Backward compatibility alias
+resolve_supervisor_id = resolve_lab_id
 
 
 class WatcherConfig:
@@ -382,25 +416,25 @@ class WatcherConfig:
         return None
 
 
-def validate_project_supervisor(
+def validate_project_lab(
     client: SupervisorClient,
     project_id: int,
-    expected_supervisor_id: int,
+    expected_lab_id: int,
     project_cache: dict[int, dict] | None = None,
 ) -> dict:
-    """Validate that a project belongs to the expected supervisor.
+    """Validate that a project belongs to the expected lab.
 
     Args:
         client: SupervisorClient for API calls
         project_id: Project ID to validate
-        expected_supervisor_id: The supervisor_id this ingestor is configured for
+        expected_lab_id: The lab_id this ingestor is configured for
         project_cache: Optional cache of projects by ID to avoid repeated API calls
 
     Returns:
         The project dict on success.
 
     Raises:
-        SupervisorMismatchError: If project belongs to different supervisor.
+        LabMismatchError: If project belongs to different lab.
         Exception: On API error (project not found, etc.)
     """
     # Check cache first
@@ -411,18 +445,23 @@ def validate_project_supervisor(
         if project_cache is not None:
             project_cache[project_id] = project
 
-    project_supervisor_id = project.get("supervisor_id")
-    if project_supervisor_id is None:
-        raise Exception(f"Project {project_id} has no supervisor_id (data integrity issue)")
+    # API returns supervisor_id (internal field name)
+    project_lab_id = project.get("supervisor_id")
+    if project_lab_id is None:
+        raise Exception(f"Project {project_id} has no lab_id (data integrity issue)")
 
-    if project_supervisor_id != expected_supervisor_id:
-        raise SupervisorMismatchError(
+    if project_lab_id != expected_lab_id:
+        raise LabMismatchError(
             project_id=project_id,
-            project_supervisor_id=project_supervisor_id,
-            configured_supervisor_id=expected_supervisor_id,
+            project_lab_id=project_lab_id,
+            configured_lab_id=expected_lab_id,
         )
 
     return project
+
+
+# Backward compatibility alias
+validate_project_supervisor = validate_project_lab
 
 
 def compute_file_hash(file_path: Path, chunk_size: int = 8192) -> str:
@@ -486,19 +525,19 @@ class IngestEventHandler(FileSystemEventHandler):
         """Process a newly created file - create pending ingest."""
         print(f"\n[NEW FILE] {file_path}")
 
-        # Validate project belongs to this ingestor's supervisor
+        # Validate project belongs to this ingestor's lab
         try:
-            validate_project_supervisor(
+            validate_project_lab(
                 client=self.client,
                 project_id=self.config.project_id,
-                expected_supervisor_id=self.supervisor_id,
+                expected_lab_id=self.supervisor_id,  # Internal param still named supervisor_id
                 project_cache=self._project_cache,
             )
-        except SupervisorMismatchError as e:
+        except LabMismatchError as e:
             print(f"  [REJECT] {e}")
             return
         except Exception as e:
-            print(f"  [ERROR] Failed to validate project supervisor: {e}")
+            print(f"  [ERROR] Failed to validate project lab: {e}")
             return
 
         # Compute relative path
@@ -742,6 +781,18 @@ def resolve_all_watchers(
     return resolved, failed
 
 
+def _get_server_url(config: dict) -> str:
+    """Get server URL from config with backward compatibility."""
+    # Prefer server_url (new)
+    if "server_url" in config:
+        return config["server_url"]
+    # Fall back to supervisor_url (deprecated)
+    if "supervisor_url" in config:
+        _emit_deprecation_warning("supervisor_url", "server_url")
+        return config["supervisor_url"]
+    raise ValueError("Missing required config: server_url (or supervisor_url)")
+
+
 def run_watcher(config_path: str):
     """Run the folder watcher based on configuration."""
     config = load_config(config_path)
@@ -752,9 +803,12 @@ def run_watcher(config_path: str):
     print("=" * 60)
     print(f"Config file: {config_path}")
 
+    # Get server URL with backward compatibility
+    server_url = _get_server_url(config)
+
     # Initialize client
     client = SupervisorClient(
-        base_url=config["supervisor_url"],
+        base_url=server_url,
         username=config["username"],
         password=config["password"],
     )
@@ -762,28 +816,28 @@ def run_watcher(config_path: str):
     # Test connection
     try:
         client._get_token()
-        print(f"Connected to supervisor at {config['supervisor_url']}")
+        print(f"Connected to server at {server_url}")
     except Exception as e:
         print(f"[ERROR] Failed to connect: {e}")
         sys.exit(1)
 
-    # Resolve supervisor_id (required for scoping)
-    supervisor_id, error = resolve_supervisor_id(config, client)
+    # Resolve lab_id (required for scoping)
+    lab_id, error = resolve_lab_id(config, client)
     if error:
         print(f"[ERROR] {error}")
         sys.exit(1)
 
-    # Show supervisor binding
+    # Show lab binding
     try:
-        supervisors = client.get_supervisors()
-        supervisor_name = next(
-            (s["name"] for s in supervisors if s["id"] == supervisor_id),
-            f"<unknown id={supervisor_id}>"
+        labs = client.get_supervisors()
+        lab_name = next(
+            (s["name"] for s in labs if s["id"] == lab_id),
+            f"<unknown id={lab_id}>"
         )
     except Exception:
-        supervisor_name = f"<id={supervisor_id}>"
+        lab_name = f"<id={lab_id}>"
 
-    print(f"Bound to supervisor: {supervisor_name} (id={supervisor_id})")
+    print(f"Bound to lab: {lab_name} (id={lab_id})")
 
     # Get UI settings
     ui_base_url = config.get("ui_url", "http://localhost:5173")
@@ -859,7 +913,7 @@ def run_watcher(config_path: str):
         handler = IngestEventHandler(
             client=client,
             watcher_config=watcher_config,
-            supervisor_id=supervisor_id,
+            supervisor_id=lab_id,  # Internal param still named supervisor_id for compat
             compute_hash=config.get("compute_hash", False),
             open_browser=open_browser,
             ui_base_url=ui_base_url,
@@ -902,14 +956,14 @@ def main():
         print("Usage: python metafirst_ingest.py <config.yaml>")
         print("\nExample config.yaml:")
         print("""
-supervisor_url: http://localhost:8000
+server_url: http://localhost:8000  # or supervisor_url (deprecated)
 ui_url: http://localhost:5173
 username: alice
 password: demo123
 
-# Supervisor binding (required if multiple supervisors exist)
-# If omitted and exactly one supervisor exists, auto-binds to it.
-supervisor_id: 1
+# Lab binding (required if multiple labs exist)
+# If omitted and exactly one lab exists, auto-binds to it.
+lab_id: 1  # or supervisor_id (deprecated)
 
 compute_hash: false
 open_browser: true  # Open browser when new file detected

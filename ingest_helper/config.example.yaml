@@ -1,29 +1,31 @@
 # metaFirst Ingest Helper Configuration
 # Copy this file to config.yaml and customize for your setup
 
-# Supervisor API connection
-supervisor_url: http://localhost:8000
+# Server API connection
+# (server_url is preferred; supervisor_url is deprecated but still works)
+server_url: http://localhost:8000
 username: alice
 password: demo123
 
 # -------------------------------------------------------------------------
-# Supervisor binding (v0.2+)
+# Lab binding (v0.4+)
 # -------------------------------------------------------------------------
-# Each ingestor instance is bound to exactly ONE supervisor.
-# Projects from other supervisors will be rejected.
+# Each ingestor instance is bound to exactly ONE lab.
+# Projects from other labs will be rejected.
 #
-# - If supervisor_id is specified, use that supervisor.
-# - If omitted AND exactly one supervisor exists, auto-bind to it.
-# - If omitted AND multiple supervisors exist, fail with error listing them.
+# - If lab_id is specified, use that lab.
+# - If omitted AND exactly one lab exists, auto-bind to it.
+# - If omitted AND multiple labs exist, fail with error listing them.
 #
-# To run ingestors for multiple supervisors, create separate config files:
-#   python metafirst_ingest.py config_supervisor_a.yaml  # terminal 1
-#   python metafirst_ingest.py config_supervisor_b.yaml  # terminal 2
+# To run ingestors for multiple labs, create separate config files:
+#   python metafirst_ingest.py config_lab_a.yaml  # terminal 1
+#   python metafirst_ingest.py config_lab_b.yaml  # terminal 2
 
-# supervisor_id: 1  # Uncomment and set if multiple supervisors exist
+# lab_id: 1  # Uncomment and set if multiple labs exist
+# Note: supervisor_id still works but is deprecated
 
 # UI settings (for browser-based metadata entry)
-ui_url: http://localhost:5173  # URL of the supervisor UI
+ui_url: http://localhost:5173  # URL of the metaFirst UI
 open_browser: true             # Auto-open browser when file detected
 
 # Ingest settings
@@ -37,7 +39,7 @@ compute_hash: false   # Whether to compute SHA256 hash for each file
 #   - Name: project_name / storage_root_name (resolved at startup)
 #
 # If both ID and name are provided, the numeric ID takes precedence.
-# Names are resolved via the supervisor API at startup.
+# Names are resolved via the server API at startup.
 
 watchers:
   # -------------------------------------------------------------------------
@@ -57,7 +59,7 @@ watchers:
   # Example 2: Using names (recommended for portability)
   # -------------------------------------------------------------------------
   # Use this when you want config that survives database reseeds.
-  # Names are resolved to IDs at startup via the supervisor API.
+  # Names are resolved to IDs at startup via the server API.
   # - watch_path: /Users/yourusername/data/rnaseq
   #   project_name: "RNA-seq Demo Project"
   #   storage_root_name: "LOCAL_DATA"
