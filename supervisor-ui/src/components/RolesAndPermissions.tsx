@@ -88,6 +88,75 @@ export function RolesAndPermissions() {
         </ul>
       </div>
 
+      {/* Getting Started Section */}
+      <div style={styles.gettingStartedSection}>
+        <h2 style={styles.sectionTitle}>Getting Started</h2>
+        <p style={styles.intro}>
+          Follow these steps to make your lab operational and ready for data management.
+        </p>
+
+        <div style={styles.stepsContainer}>
+          <div style={styles.step}>
+            <div style={styles.stepNumber}>1</div>
+            <div style={styles.stepContent}>
+              <h4 style={styles.stepTitle}>Assign a PI or Steward</h4>
+              <p style={styles.stepDescription}>
+                Every lab needs at least one PI or Data Steward to manage projects
+                and RDMPs. Navigate to <strong>Manage Members</strong> to add team
+                members and assign roles.
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.step}>
+            <div style={styles.stepNumber}>2</div>
+            <div style={styles.stepContent}>
+              <h4 style={styles.stepTitle}>Create a Project</h4>
+              <p style={styles.stepDescription}>
+                Projects organize your research data. Create a project from the
+                main dashboard to get started. Give it a descriptive name that
+                helps team members identify its purpose.
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.step}>
+            <div style={styles.stepNumber}>3</div>
+            <div style={styles.stepContent}>
+              <h4 style={styles.stepTitle}>Set Up an RDMP</h4>
+              <p style={styles.stepDescription}>
+                A Research Data Management Plan (RDMP) defines how data is handled
+                in your project. Create a draft RDMP from the project view, then
+                have a PI activate it to enable data operations.
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.step}>
+            <div style={styles.stepNumber}>4</div>
+            <div style={styles.stepContent}>
+              <h4 style={styles.stepTitle}>Configure an Ingestor</h4>
+              <p style={styles.stepDescription}>
+                Set up a storage root to enable data ingestion. This tells the
+                system where to look for new data files. Once configured, data
+                can be ingested into your project.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.readyBox}>
+          <span style={styles.readyIcon}>&#10003;</span>
+          <div>
+            <strong>Ready to go!</strong>
+            <p style={styles.readyText}>
+              Once all four steps are complete, your lab is fully operational.
+              You can ingest data, create samples, and manage your research outputs.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Project State & RDMP Lifecycle Section */}
       <div style={styles.lifecycleSection}>
         <h2 style={styles.sectionTitle}>Project State & RDMP Lifecycle</h2>
@@ -371,5 +440,71 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     color: '#4b5563',
     lineHeight: 1.8,
+  },
+  gettingStartedSection: {
+    marginTop: '40px',
+    paddingTop: '32px',
+    borderTop: '1px solid #e5e7eb',
+  },
+  stepsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    marginTop: '20px',
+  },
+  step: {
+    display: 'flex',
+    gap: '16px',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '16px',
+  },
+  stepNumber: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    background: '#2563eb',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 600,
+    fontSize: '14px',
+    flexShrink: 0,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: '15px',
+    fontWeight: 600,
+    color: '#111827',
+    margin: '0 0 4px 0',
+  },
+  stepDescription: {
+    fontSize: '14px',
+    color: '#4b5563',
+    margin: 0,
+    lineHeight: 1.5,
+  },
+  readyBox: {
+    marginTop: '20px',
+    display: 'flex',
+    gap: '12px',
+    background: '#d1fae5',
+    border: '1px solid #a7f3d0',
+    borderRadius: '8px',
+    padding: '16px',
+  },
+  readyIcon: {
+    fontSize: '20px',
+    color: '#059669',
+    fontWeight: 'bold',
+  },
+  readyText: {
+    fontSize: '14px',
+    color: '#065f46',
+    margin: '4px 0 0 0',
   },
 };

@@ -1,14 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import type { Project, Supervisor } from '../types';
+import type { Project, Supervisor, LabRole } from '../types';
 import { StatusBadge, getRDMPStatus, type RDMPStatus } from './StatusBadge';
+import { LabOnboardingChecklist } from './LabOnboardingChecklist';
 
 interface ProjectWithDetails extends Project {
   supervisorName?: string;
   activeRdmpTitle?: string | null;
   rdmpStatus: RDMPStatus;
-  userRole?: string;
+  userRole?: LabRole | null;
+}
+
+interface LabInfo {
+  id: number;
+  name: string;
+  userRole: LabRole | null;
 }
 
 interface ProjectsOverviewProps {
@@ -18,6 +25,7 @@ interface ProjectsOverviewProps {
 export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectWithDetails[]>([]);
+  const [labs, setLabs] = useState<LabInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,6 +44,29 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       const supervisorMap = new Map<number, Supervisor>();
       supervisorsData.forEach((s) => supervisorMap.set(s.id, s));
 
+      // Track unique labs with user roles
+      const labRoles = new Map<number, LabRole | null>();
+
+      // Get user's role for each supervisor first (to avoid duplicate API calls)
+      await Promise.all(
+        supervisorsData.map(async (supervisor) => {
+          try {
+            const roleInfo = await apiClient.getMyLabRole(supervisor.id);
+            labRoles.set(supervisor.id, roleInfo.role ?? null);
+          } catch {
+            labRoles.set(supervisor.id, null);
+          }
+        })
+      );
+
+      // Build labs array for onboarding checklists
+      const labsArray: LabInfo[] = supervisorsData.map((s) => ({
+        id: s.id,
+        name: s.name,
+        userRole: labRoles.get(s.id) ?? null,
+      }));
+      setLabs(labsArray);
+
       // For each project, get RDMP status and enrich with supervisor info
       const enrichedProjects: ProjectWithDetails[] = await Promise.all(
         projectsData.map(async (project) => {
@@ -53,16 +84,8 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
             // Ignore errors - project might not have any RDMPs
           }
 
-          // Get user's role from supervisor members (if available)
-          let userRole: string | undefined;
-          if (supervisor) {
-            try {
-              const roleInfo = await apiClient.getMyLabRole(supervisor.id);
-              userRole = roleInfo.role ?? undefined;
-            } catch {
-              // Ignore - user might not have access
-            }
-          }
+          // Get user's role from the pre-fetched map
+          const userRole = supervisor ? labRoles.get(supervisor.id) ?? null : null;
 
           return {
             ...project,
@@ -127,6 +150,16 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
           style={styles.searchInput}
         />
       </div>
+
+      {/* Lab onboarding checklists - shown to PI/Steward only */}
+      {labs.map((lab) => (
+        <LabOnboardingChecklist
+          key={lab.id}
+          supervisorId={lab.id}
+          supervisorName={lab.name}
+          userRole={lab.userRole}
+        />
+      ))}
 
       <div style={styles.projectsGrid}>
         {filteredProjects.length === 0 ? (
