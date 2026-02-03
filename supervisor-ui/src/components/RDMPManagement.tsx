@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
-import type { Project, RDMPVersion } from '../types';
+import type { Project, RDMPVersion, LabRole } from '../types';
+import { PermissionHint, hasPermission } from './PermissionHint';
 
 interface RDMPManagementProps {
   project: Project;
   onRDMPActivated?: (activeRDMP: RDMPVersion) => void;
+  userRole?: LabRole | null;
 }
 
-export function RDMPManagement({ project, onRDMPActivated }: RDMPManagementProps) {
+export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManagementProps) {
+  const canActivate = hasPermission(userRole ?? null, 'PI');
   const [rdmps, setRdmps] = useState<RDMPVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -309,12 +312,17 @@ export function RDMPManagement({ project, onRDMPActivated }: RDMPManagementProps
                           Edit
                         </button>
                         <button
-                          style={styles.activateButton}
+                          style={{
+                            ...styles.activateButton,
+                            ...(canActivate ? {} : styles.disabledButton),
+                          }}
                           onClick={() => handleActivate(rdmp.id)}
-                          disabled={activatingId === rdmp.id}
+                          disabled={activatingId === rdmp.id || !canActivate}
+                          title={canActivate ? undefined : 'Requires: PI'}
                         >
                           {activatingId === rdmp.id ? 'Activating...' : 'Activate'}
                         </button>
+                        {!canActivate && <PermissionHint requiredRole="PI" inline />}
                       </>
                     )}
                     {rdmp.status === 'ACTIVE' && (
@@ -538,5 +546,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     color: '#059669',
     fontWeight: 500,
+  },
+  disabledButton: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
   },
 };

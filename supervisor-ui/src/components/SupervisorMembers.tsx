@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import type { Supervisor, SupervisorMember } from '../types';
+import type { Supervisor, SupervisorMember, LabRole } from '../types';
+import { RoleBadge } from './RoleBadge';
+import { PermissionHint, hasPermission } from './PermissionHint';
 
 export function SupervisorMembers() {
   const { supervisorId } = useParams<{ supervisorId: string }>();
@@ -9,6 +11,8 @@ export function SupervisorMembers() {
 
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
   const [members, setMembers] = useState<SupervisorMember[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<LabRole | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,18 +25,26 @@ export function SupervisorMembers() {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editRole, setEditRole] = useState<string>('');
 
+  // Permission checks
+  const canAddMember = hasPermission(currentUserRole, ['STEWARD', 'PI']);
+  const canEditRole = hasPermission(currentUserRole, 'PI');
+  const canRemoveMember = hasPermission(currentUserRole, 'PI');
+
   const loadData = useCallback(async () => {
     if (!supervisorId) return;
 
     setLoading(true);
     setError(null);
     try {
-      const [supervisorData, membersData] = await Promise.all([
+      const [supervisorData, membersData, myRoleData] = await Promise.all([
         apiClient.getSupervisor(parseInt(supervisorId)),
         apiClient.getSupervisorMembers(parseInt(supervisorId)),
+        apiClient.getMyLabRole(parseInt(supervisorId)),
       ]);
       setSupervisor(supervisorData);
       setMembers(membersData);
+      setCurrentUserRole(myRoleData.role);
+      setCurrentUserId(myRoleData.user_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load data');
     } finally {
@@ -77,7 +89,7 @@ export function SupervisorMembers() {
 
   const handleRemoveMember = async (userId: number, username: string) => {
     if (!supervisorId) return;
-    if (!confirm(`Remove ${username} from this supervisor?`)) return;
+    if (!confirm(`Remove ${username} from this lab?`)) return;
 
     setError(null);
     try {
@@ -125,7 +137,14 @@ export function SupervisorMembers() {
         </button>
         <div>
           <h2 style={styles.title}>{supervisor.name}</h2>
-          <p style={styles.subtitle}>Manage supervisor members</p>
+          <p style={styles.subtitle}>
+            Manage lab members
+            {currentUserRole && (
+              <span style={{ marginLeft: '8px' }}>
+                (Your role: <RoleBadge role={currentUserRole} size="small" />)
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -133,7 +152,10 @@ export function SupervisorMembers() {
 
       {/* Add Member Form */}
       <div style={styles.addForm}>
-        <h3 style={styles.sectionTitle}>Add Member</h3>
+        <h3 style={styles.sectionTitle}>
+          Add Member
+          {!canAddMember && <PermissionHint requiredRole={['STEWARD', 'PI']} inline />}
+        </h3>
         <form onSubmit={handleAddMember} style={styles.form}>
           <input
             type="text"
@@ -141,19 +163,26 @@ export function SupervisorMembers() {
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             style={styles.input}
-            disabled={adding}
+            disabled={adding || !canAddMember}
           />
           <select
             value={newRole}
             onChange={(e) => setNewRole(e.target.value as 'RESEARCHER' | 'STEWARD' | 'PI')}
             style={styles.select}
-            disabled={adding}
+            disabled={adding || !canAddMember}
           >
             <option value="RESEARCHER">RESEARCHER</option>
             <option value="STEWARD">STEWARD</option>
             <option value="PI">PI</option>
           </select>
-          <button type="submit" style={styles.addButton} disabled={adding || !newUsername.trim()}>
+          <button
+            type="submit"
+            style={{
+              ...styles.addButton,
+              ...(canAddMember ? {} : styles.disabledButton),
+            }}
+            disabled={adding || !newUsername.trim() || !canAddMember}
+          >
             {adding ? 'Adding...' : 'Add Member'}
           </button>
         </form>
@@ -175,56 +204,76 @@ export function SupervisorMembers() {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
-                <tr key={member.user_id}>
-                  <td style={styles.td}>{member.username}</td>
-                  <td style={styles.td}>{member.display_name || '-'}</td>
-                  <td style={styles.td}>
-                    {editingUserId === member.user_id ? (
-                      <select
-                        value={editRole}
-                        onChange={(e) => setEditRole(e.target.value)}
-                        style={styles.selectSmall}
-                      >
-                        <option value="RESEARCHER">RESEARCHER</option>
-                        <option value="STEWARD">STEWARD</option>
-                        <option value="PI">PI</option>
-                      </select>
-                    ) : (
-                      <span style={styles.roleBadge} data-role={member.role}>
-                        {member.role}
-                      </span>
-                    )}
-                  </td>
-                  <td style={styles.td}>
-                    {editingUserId === member.user_id ? (
-                      <>
-                        <button
-                          style={styles.saveButton}
-                          onClick={() => handleUpdateRole(member.user_id)}
+              {members.map((member) => {
+                const isCurrentUser = member.user_id === currentUserId;
+                return (
+                  <tr
+                    key={member.user_id}
+                    style={isCurrentUser ? styles.currentUserRow : undefined}
+                  >
+                    <td style={styles.td}>
+                      {member.username}
+                      {isCurrentUser && <span style={styles.youBadge}>you</span>}
+                    </td>
+                    <td style={styles.td}>{member.display_name || '-'}</td>
+                    <td style={styles.td}>
+                      {editingUserId === member.user_id ? (
+                        <select
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value)}
+                          style={styles.selectSmall}
                         >
-                          Save
-                        </button>
-                        <button style={styles.cancelButton} onClick={cancelEdit}>
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button style={styles.editButton} onClick={() => startEdit(member)}>
-                          Edit
-                        </button>
-                        <button
-                          style={styles.removeButton}
-                          onClick={() => handleRemoveMember(member.user_id, member.username)}
-                        >
-                          Remove
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                          <option value="RESEARCHER">RESEARCHER</option>
+                          <option value="STEWARD">STEWARD</option>
+                          <option value="PI">PI</option>
+                        </select>
+                      ) : (
+                        <RoleBadge role={member.role as LabRole} size="small" />
+                      )}
+                    </td>
+                    <td style={styles.td}>
+                      {editingUserId === member.user_id ? (
+                        <>
+                          <button
+                            style={styles.saveButton}
+                            onClick={() => handleUpdateRole(member.user_id)}
+                          >
+                            Save
+                          </button>
+                          <button style={styles.cancelButton} onClick={cancelEdit}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            style={{
+                              ...styles.editButton,
+                              ...(canEditRole ? {} : styles.disabledActionButton),
+                            }}
+                            onClick={() => startEdit(member)}
+                            disabled={!canEditRole}
+                            title={canEditRole ? undefined : 'Requires: PI'}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            style={{
+                              ...styles.removeButton,
+                              ...(canRemoveMember ? {} : styles.disabledActionButton),
+                            }}
+                            onClick={() => handleRemoveMember(member.user_id, member.username)}
+                            disabled={!canRemoveMember}
+                            title={canRemoveMember ? undefined : 'Requires: PI'}
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -352,15 +401,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     color: '#111827',
   },
-  roleBadge: {
-    display: 'inline-block',
-    padding: '2px 8px',
-    fontSize: '12px',
-    fontWeight: 500,
-    borderRadius: '4px',
-    background: '#e5e7eb',
-    color: '#374151',
-  },
   editButton: {
     padding: '4px 8px',
     fontSize: '12px',
@@ -396,5 +436,27 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
     color: '#dc2626',
     cursor: 'pointer',
+  },
+  currentUserRow: {
+    background: '#fefce8',
+  },
+  youBadge: {
+    marginLeft: '6px',
+    padding: '1px 6px',
+    fontSize: '10px',
+    fontWeight: 500,
+    background: '#fef3c7',
+    color: '#92400e',
+    borderRadius: '4px',
+  },
+  disabledButton: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  disabledActionButton: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
+    color: '#9ca3af',
+    borderColor: '#e5e7eb',
   },
 };

@@ -183,3 +183,12 @@ export interface SampleListResponse {
   limit: number;
   offset: number;
 }
+
+export type LabRole = 'PI' | 'STEWARD' | 'RESEARCHER';
+
+export interface LabRoleInfo {
+  supervisor_id: number;
+  supervisor_name: string;
+  user_id: number;
+  role: LabRole | null;
+}

@@ -1,4 +1,4 @@
-import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse } from '../types';
+import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo } from '../types';
 
 const API_BASE = '/api';
 
@@ -85,6 +85,10 @@ class ApiClient {
   // Supervisor Members
   async getSupervisorMembers(supervisorId: number): Promise<SupervisorMember[]> {
     return this.request<SupervisorMember[]>(`/supervisors/${supervisorId}/members`);
+  }
+
+  async getMyLabRole(supervisorId: number): Promise<LabRoleInfo> {
+    return this.request<LabRoleInfo>(`/supervisors/${supervisorId}/my-role`);
   }
 
   async addSupervisorMember(supervisorId: number, username: string, role: string): Promise<SupervisorMember> {

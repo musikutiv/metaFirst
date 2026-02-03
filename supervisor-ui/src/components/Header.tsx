@@ -1,15 +1,19 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import type { User } from '../types';
+import type { User, LabRole } from '../types';
+import { LabContext } from './LabContext';
 
 interface HeaderProps {
   user: User;
   onLogout: () => void;
+  labName?: string | null;
+  userRole?: LabRole | null;
 }
 
-export function Header({ user, onLogout }: HeaderProps) {
+export function Header({ user, onLogout, labName, userRole }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isOverview = location.pathname === '/overview';
+  const isRoles = location.pathname === '/roles';
 
   return (
     <header style={styles.header}>
@@ -28,7 +32,17 @@ export function Header({ user, onLogout }: HeaderProps) {
           >
             All Projects
           </button>
+          <button
+            style={{
+              ...styles.navLink,
+              ...(isRoles ? styles.navLinkActive : {}),
+            }}
+            onClick={() => navigate('/roles')}
+          >
+            Roles
+          </button>
         </nav>
+        {labName && <LabContext labName={labName} userRole={userRole ?? null} />}
       </div>
       <div style={styles.right}>
         <span style={styles.user}>{user.display_name}</span>

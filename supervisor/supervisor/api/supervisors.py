@@ -144,6 +144,45 @@ def update_supervisor(
 # Supervisor Member Management
 # ============================================================================
 
+class CurrentUserRoleResponse(BaseModel):
+    """Response for current user's role in a supervisor/lab."""
+    supervisor_id: int
+    supervisor_name: str
+    user_id: int
+    role: str | None  # None if not a member
+
+
+@router.get("/{supervisor_id}/my-role", response_model=CurrentUserRoleResponse)
+def get_my_role(
+    supervisor_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    """Get current user's role in a supervisor/lab.
+
+    Returns the user's role or null if they are not a member.
+    """
+    supervisor = db.query(Supervisor).filter(Supervisor.id == supervisor_id).first()
+    if not supervisor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab not found")
+
+    membership = (
+        db.query(SupervisorMembership)
+        .filter(
+            SupervisorMembership.supervisor_id == supervisor_id,
+            SupervisorMembership.user_id == current_user.id
+        )
+        .first()
+    )
+
+    return CurrentUserRoleResponse(
+        supervisor_id=supervisor_id,
+        supervisor_name=supervisor.name,
+        user_id=current_user.id,
+        role=membership.role.value if membership else None
+    )
+
+
 @router.get("/{supervisor_id}/members", response_model=list[SupervisorMemberResponse])
 def list_supervisor_members(
     supervisor_id: int,

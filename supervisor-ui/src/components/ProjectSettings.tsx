@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import type { Project } from '../types';
+import type { Project, LabRole } from '../types';
+import { PermissionHint, hasPermission } from './PermissionHint';
 
 interface ProjectSettingsProps {
   project: Project;
   onProjectUpdated: (project: Project) => void;
+  userRole?: LabRole | null;
 }
 
-export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsProps) {
+export function ProjectSettings({ project, onProjectUpdated, userRole }: ProjectSettingsProps) {
+  const canEdit = hasPermission(userRole ?? null, ['STEWARD', 'PI']);
   const [ruleType, setRuleType] = useState<string>(project.sample_id_rule_type || '');
   const [regex, setRegex] = useState<string>(project.sample_id_regex || '');
   const [testFilename, setTestFilename] = useState<string>('');
@@ -110,7 +113,10 @@ export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsPr
 
   return (
     <div style={styles.container}>
-      <h3 style={styles.title}>Project Settings</h3>
+      <h3 style={styles.title}>
+        Project Settings
+        {!canEdit && <PermissionHint requiredRole={['STEWARD', 'PI']} inline />}
+      </h3>
 
       <div style={styles.section}>
         <h4 style={styles.sectionTitle}>Sample ID Extraction Rule</h4>
@@ -126,6 +132,7 @@ export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsPr
             style={styles.select}
             value={ruleType}
             onChange={(e) => setRuleType(e.target.value)}
+            disabled={!canEdit}
           >
             <option value="">No automatic detection</option>
             <option value="filename_regex">Filename Regex</option>
@@ -142,6 +149,7 @@ export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsPr
                 value={regex}
                 onChange={(e) => setRegex(e.target.value)}
                 placeholder="e.g., (?P<sample_id>SAMPLE-\d+)"
+                disabled={!canEdit}
               />
               <p style={styles.hint}>
                 Example patterns:
@@ -198,7 +206,8 @@ export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsPr
             type="button"
             style={styles.clearButton}
             onClick={handleClear}
-            disabled={saving}
+            disabled={saving || !canEdit}
+            title={canEdit ? undefined : 'Requires: STEWARD or PI'}
           >
             Clear Rule
           </button>
@@ -207,10 +216,11 @@ export function ProjectSettings({ project, onProjectUpdated }: ProjectSettingsPr
           type="button"
           style={{
             ...styles.saveButton,
-            ...(hasChanges ? {} : styles.saveButtonDisabled),
+            ...((hasChanges && canEdit) ? {} : styles.saveButtonDisabled),
           }}
           onClick={handleSave}
-          disabled={saving || !hasChanges}
+          disabled={saving || !hasChanges || !canEdit}
+          title={canEdit ? undefined : 'Requires: STEWARD or PI'}
         >
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
