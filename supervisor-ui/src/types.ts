@@ -192,3 +192,21 @@ export interface LabRoleInfo {
   user_id: number;
   role: LabRole | null;
 }
+
+// Remediation tasks (advisory, non-destructive)
+export type RemediationPriority = 'urgent' | 'recommended' | 'completed';
+
+export interface RemediationTask {
+  id: string;
+  priority: RemediationPriority;
+  title: string;
+  reason: string;
+  impact: string;
+  steps: string[];
+  learnMore: string;
+  actionPath: string;
+  actionLabel: string;
+  entityType: 'project' | 'sample' | 'rdmp' | 'ingest' | 'data';
+  entityId?: number;
+  entityName?: string;
+}

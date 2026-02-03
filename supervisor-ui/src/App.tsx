@@ -17,6 +17,8 @@ import { hasPermission } from './components/PermissionHint';
 import { SupervisorMembers } from './components/SupervisorMembers';
 import { ProjectsOverview } from './components/ProjectsOverview';
 import { RolesAndPermissions } from './components/RolesAndPermissions';
+import { RemediationTaskList } from './components/RemediationTaskList';
+import { useRemediationTasks } from './hooks/useRemediationTasks';
 import type { User, Project, RDMP, Sample, RawDataItem, PendingIngest, StorageRoot, RDMPVersion, LabRole } from './types';
 
 function App() {
@@ -43,6 +45,8 @@ function App() {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [rawData, setRawData] = useState<RawDataItem[]>([]);
   const [storageRoots, setStorageRoots] = useState<StorageRoot[]>([]);
+  const [pendingIngests, setPendingIngests] = useState<PendingIngest[]>([]);
+  const [hasDraftRDMP, setHasDraftRDMP] = useState(false);
 
   // Lab context state
   const [labName, setLabName] = useState<string | null>(null);
@@ -118,14 +122,19 @@ function App() {
         const project = projects.find(p => p.id === projectIdToLoad);
         const supervisorId = project?.supervisor_id;
 
-        const [rdmpData, activeRdmpData, samplesResponse, rawDataData, storageRootsData, labRoleData] = await Promise.all([
+        const [rdmpData, activeRdmpData, samplesResponse, rawDataData, storageRootsData, labRoleData, pendingIngestsData, rdmpVersionsData] = await Promise.all([
           apiClient.getProjectRDMP(projectIdToLoad).catch(() => null),
           apiClient.getActiveRDMP(projectIdToLoad).catch(() => null),
           apiClient.getSamples(projectIdToLoad),
           apiClient.getRawData(projectIdToLoad),
           apiClient.getStorageRoots(projectIdToLoad),
           supervisorId ? apiClient.getMyLabRole(supervisorId).catch(() => null) : Promise.resolve(null),
+          apiClient.getPendingIngests(projectIdToLoad, 'PENDING').catch(() => []),
+          apiClient.listRDMPVersions(projectIdToLoad).catch(() => []),
         ]);
+
+        // Check if there's a draft RDMP
+        const draftExists = rdmpVersionsData.some((r: RDMPVersion) => r.status === 'DRAFT');
 
         // Only update state if this effect is still active (project hasn't changed)
         if (isActive) {
@@ -136,6 +145,8 @@ function App() {
           setStorageRoots(storageRootsData);
           setLabName(labRoleData?.supervisor_name ?? null);
           setUserRole(labRoleData?.role ?? null);
+          setPendingIngests(pendingIngestsData);
+          setHasDraftRDMP(draftExists);
           setLoadingData(false);
         }
       } catch (error) {
@@ -268,6 +279,20 @@ function App() {
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const fields = rdmp?.rdmp_json.fields || [];
 
+  // Derive remediation tasks from project data
+  const remediationTasks = useRemediationTasks({
+    projectId: selectedProjectId,
+    samples,
+    rawData,
+    activeRDMP,
+    pendingIngests,
+    storageRoots,
+    hasDraftRDMP,
+  });
+
+  // Count pending remediation tasks for badge
+  const pendingTaskCount = remediationTasks.filter(t => t.priority !== 'completed').length;
+
   // Render project-scoped content (metadata table or inbox)
   const renderProjectContent = (view: 'metadata' | 'inbox') => {
     if (!selectedProject) {
@@ -321,6 +346,7 @@ function App() {
     if (location.pathname === '/inbox') return 'inbox';
     if (location.pathname === '/settings') return 'settings';
     if (location.pathname === '/rdmps') return 'rdmps';
+    if (location.pathname === '/tasks') return 'tasks';
     return 'metadata';
   };
   const currentTab = getCurrentTab();
@@ -450,6 +476,18 @@ function App() {
                       >
                         Settings
                       </button>
+                      <button
+                        style={{
+                          ...styles.tab,
+                          ...(currentTab === 'tasks' ? styles.tabActive : {}),
+                        }}
+                        onClick={() => navigate('/tasks')}
+                      >
+                        Tasks
+                        {pendingTaskCount > 0 && (
+                          <span style={styles.taskBadge}>{pendingTaskCount}</span>
+                        )}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -485,6 +523,18 @@ function App() {
                       ) : (
                         <div style={styles.placeholder}>
                           <p>Select a project to manage RDMPs</p>
+                        </div>
+                      )
+                    }
+                  />
+                  <Route
+                    path="/tasks"
+                    element={
+                      selectedProject ? (
+                        <RemediationTaskList tasks={remediationTasks} />
+                      ) : (
+                        <div style={styles.placeholder}>
+                          <p>Select a project to view tasks</p>
                         </div>
                       )
                     }
@@ -590,6 +640,20 @@ const styles: Record<string, React.CSSProperties> = {
   tabActive: {
     color: '#2563eb',
     borderBottomColor: '#2563eb',
+  },
+  taskBadge: {
+    marginLeft: '6px',
+    minWidth: '18px',
+    height: '18px',
+    borderRadius: '9px',
+    background: '#dc2626',
+    color: '#fff',
+    fontSize: '11px',
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 5px',
   },
 };
 

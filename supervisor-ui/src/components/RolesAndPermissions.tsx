@@ -182,6 +182,76 @@ export function RolesAndPermissions() {
           The UI will show clear guidance on what action is needed to unblock operations.
         </p>
       </div>
+
+      {/* Remediation Tasks Section */}
+      <div style={styles.remediationSection}>
+        <h2 style={styles.sectionTitle}>Remediation Tasks (Advisory)</h2>
+        <p style={styles.intro}>
+          The Tasks tab in each project shows suggested actions to improve your data
+          organization. These are advisory recommendations, not requirements.
+        </p>
+
+        <div style={styles.advisoryCallout}>
+          <span style={styles.advisoryIcon}>ℹ</span>
+          <div>
+            <strong>Non-destructive and optional</strong>
+            <p style={styles.advisoryText}>
+              Remediation tasks never delete or modify your data automatically. They
+              provide guidance on what you could improve, with links to the relevant
+              screens where you can take action manually.
+            </p>
+          </div>
+        </div>
+
+        <h3 style={styles.subsectionTitle}>Task Priorities</h3>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Priority</th>
+              <th style={styles.th}>Meaning</th>
+              <th style={styles.th}>Examples</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.priorityBadge, background: '#dc2626' }}>
+                  Urgent
+                </span>
+              </td>
+              <td style={styles.td}>Blocks core project functionality</td>
+              <td style={styles.td}>No active RDMP, no storage root configured</td>
+            </tr>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.priorityBadge, background: '#d97706' }}>
+                  Recommended
+                </span>
+              </td>
+              <td style={styles.td}>Improves data quality and organization</td>
+              <td style={styles.td}>Incomplete metadata, pending ingests, orphaned files</td>
+            </tr>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.priorityBadge, background: '#059669' }}>
+                  Completed
+                </span>
+              </td>
+              <td style={styles.td}>Previously addressed tasks</td>
+              <td style={styles.td}>Tasks you have resolved</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style={styles.subsectionTitle}>Typical Workflow</h3>
+        <ol style={styles.workflowList}>
+          <li>Open the <strong>Tasks</strong> tab in your project</li>
+          <li>Review urgent tasks first (these may block operations)</li>
+          <li>Click <strong>Learn more</strong> on any task to understand its impact</li>
+          <li>Click the action button to go to the screen where you can fix the issue</li>
+          <li>Make changes as needed (all changes are manual and reversible)</li>
+        </ol>
+      </div>
     </div>
   );
 }
@@ -367,6 +437,54 @@ const styles: Record<string, React.CSSProperties> = {
   },
   blockedList: {
     margin: '0 0 12px 0',
+    paddingLeft: '20px',
+    fontSize: '14px',
+    color: '#4b5563',
+    lineHeight: 1.8,
+  },
+  remediationSection: {
+    marginTop: '40px',
+    paddingTop: '32px',
+    borderTop: '1px solid #e5e7eb',
+  },
+  advisoryCallout: {
+    display: 'flex',
+    gap: '12px',
+    padding: '16px',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    borderRadius: '8px',
+    marginBottom: '20px',
+  },
+  advisoryIcon: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    background: '#3b82f6',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    flexShrink: 0,
+  },
+  advisoryText: {
+    fontSize: '13px',
+    color: '#1e40af',
+    margin: '4px 0 0 0',
+    lineHeight: 1.5,
+  },
+  priorityBadge: {
+    display: 'inline-block',
+    padding: '2px 8px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#fff',
+    borderRadius: '4px',
+  },
+  workflowList: {
+    margin: '12px 0 0 0',
     paddingLeft: '20px',
     fontSize: '14px',
     color: '#4b5563',

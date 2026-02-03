@@ -169,12 +169,23 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                 )}
               </div>
 
-              <button
-                style={styles.openButton}
-                onClick={() => onSelectProject(project.id)}
-              >
-                Open Project
-              </button>
+              <div style={styles.cardButtons}>
+                <button
+                  style={styles.openButton}
+                  onClick={() => onSelectProject(project.id)}
+                >
+                  Open Project
+                </button>
+                <button
+                  style={styles.tasksLink}
+                  onClick={() => {
+                    onSelectProject(project.id);
+                    navigate('/tasks');
+                  }}
+                >
+                  View Tasks
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -295,6 +306,11 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     textDecoration: 'underline',
   },
+  cardButtons: {
+    display: 'flex',
+    gap: '8px',
+    marginTop: 'auto',
+  },
   openButton: {
     padding: '10px 16px',
     fontSize: '14px',
@@ -304,6 +320,16 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    marginTop: 'auto',
+    flex: 1,
+  },
+  tasksLink: {
+    padding: '10px 12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    background: '#fff',
+    color: '#374151',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    cursor: 'pointer',
   },
 };
