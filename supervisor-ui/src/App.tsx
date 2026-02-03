@@ -12,7 +12,8 @@ import { SampleDetailModal } from './components/SampleDetailModal';
 import { ProjectSettings } from './components/ProjectSettings';
 import { RDMPManagement } from './components/RDMPManagement';
 import { CreateProjectWizard } from './components/CreateProjectWizard';
-import { NoActiveRDMPBanner } from './components/NoActiveRDMPBanner';
+import { ProjectStatusCallout } from './components/ProjectStatusCallout';
+import { hasPermission } from './components/PermissionHint';
 import { SupervisorMembers } from './components/SupervisorMembers';
 import { ProjectsOverview } from './components/ProjectsOverview';
 import { RolesAndPermissions } from './components/RolesAndPermissions';
@@ -399,9 +400,13 @@ function App() {
                       ) : null}
                     </div>
 
-                    {/* No Active RDMP Warning Banner */}
-                    {!loadingData && !activeRDMP && (
-                      <NoActiveRDMPBanner projectId={selectedProject.id} />
+                    {/* Project Status Callout */}
+                    {!loadingData && selectedProject && (
+                      <ProjectStatusCallout
+                        projectId={selectedProject.id}
+                        rdmpStatus={activeRDMP ? 'ACTIVE' : 'NONE'}
+                        canActivate={hasPermission(userRole, 'PI')}
+                      />
                     )}
 
                     {/* Navigation tabs */}

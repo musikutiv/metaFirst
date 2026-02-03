@@ -87,6 +87,101 @@ export function RolesAndPermissions() {
           </li>
         </ul>
       </div>
+
+      {/* Project State & RDMP Lifecycle Section */}
+      <div style={styles.lifecycleSection}>
+        <h2 style={styles.sectionTitle}>Project State & RDMP Lifecycle</h2>
+        <p style={styles.intro}>
+          Every project requires an active RDMP (Research Data Management Plan) to be
+          operational. The RDMP defines how data is managed, who can access it, and
+          what metadata is required.
+        </p>
+
+        <h3 style={styles.subsectionTitle}>RDMP States</h3>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>State</th>
+              <th style={styles.th}>Meaning</th>
+              <th style={styles.th}>What You Can Do</th>
+              <th style={styles.th}>Next Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.statusBadge, background: '#fef2f2', color: '#991b1b' }}>
+                  No RDMP
+                </span>
+              </td>
+              <td style={styles.td}>Project has no RDMP created</td>
+              <td style={styles.td}>View project metadata (read-only)</td>
+              <td style={styles.td}>Create an RDMP draft</td>
+            </tr>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.statusBadge, background: '#fef3c7', color: '#92400e' }}>
+                  Draft
+                </span>
+              </td>
+              <td style={styles.td}>RDMP created but not yet activated</td>
+              <td style={styles.td}>Edit the draft, view project</td>
+              <td style={styles.td}>Have a PI activate the RDMP</td>
+            </tr>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.statusBadge, background: '#d1fae5', color: '#065f46' }}>
+                  Active
+                </span>
+              </td>
+              <td style={styles.td}>Project is operational</td>
+              <td style={styles.td}>Ingest data, manage samples, full operations</td>
+              <td style={styles.td}>Continue working or create new draft for updates</td>
+            </tr>
+            <tr>
+              <td style={styles.td}>
+                <span style={{ ...styles.statusBadge, background: '#f3f4f6', color: '#6b7280' }}>
+                  Superseded
+                </span>
+              </td>
+              <td style={styles.td}>Replaced by a newer RDMP version</td>
+              <td style={styles.td}>View historical data</td>
+              <td style={styles.td}>Work with the active RDMP</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style={styles.subsectionTitle}>State Transitions</h3>
+        <div style={styles.transitionFlow}>
+          <div style={styles.flowItem}>
+            <span style={styles.flowState}>No RDMP</span>
+            <span style={styles.flowArrow}>→</span>
+            <span style={styles.flowAction}>Create Draft</span>
+            <span style={styles.flowArrow}>→</span>
+            <span style={styles.flowState}>Draft</span>
+            <span style={styles.flowArrow}>→</span>
+            <span style={styles.flowAction}>Activate (PI)</span>
+            <span style={styles.flowArrow}>→</span>
+            <span style={styles.flowState}>Active</span>
+          </div>
+          <p style={styles.flowNote}>
+            When a new RDMP is activated, the previous active RDMP becomes Superseded.
+          </p>
+        </div>
+
+        <h3 style={styles.subsectionTitle}>Blocked Operations</h3>
+        <p style={styles.blockNote}>
+          Without an active RDMP, the following operations are blocked:
+        </p>
+        <ul style={styles.blockedList}>
+          <li>Data ingestion (adding new files to the project)</li>
+          <li>Sample creation</li>
+          <li>Metadata modifications</li>
+        </ul>
+        <p style={styles.blockNote}>
+          The UI will show clear guidance on what action is needed to unblock operations.
+        </p>
+      </div>
     </div>
   );
 }
@@ -182,6 +277,96 @@ const styles: Record<string, React.CSSProperties> = {
   },
   notesList: {
     margin: 0,
+    paddingLeft: '20px',
+    fontSize: '14px',
+    color: '#4b5563',
+    lineHeight: 1.8,
+  },
+  lifecycleSection: {
+    marginTop: '40px',
+    paddingTop: '32px',
+    borderTop: '1px solid #e5e7eb',
+  },
+  sectionTitle: {
+    fontSize: '24px',
+    fontWeight: 600,
+    color: '#111827',
+    marginBottom: '16px',
+  },
+  subsectionTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#374151',
+    marginTop: '24px',
+    marginBottom: '12px',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '14px',
+  },
+  th: {
+    textAlign: 'left',
+    padding: '12px',
+    borderBottom: '2px solid #e5e7eb',
+    fontWeight: 600,
+    color: '#374151',
+    background: '#f9fafb',
+  },
+  td: {
+    padding: '12px',
+    borderBottom: '1px solid #e5e7eb',
+    color: '#4b5563',
+    verticalAlign: 'top',
+  },
+  statusBadge: {
+    display: 'inline-block',
+    padding: '2px 8px',
+    fontSize: '12px',
+    fontWeight: 500,
+    borderRadius: '4px',
+  },
+  transitionFlow: {
+    background: '#f9fafb',
+    borderRadius: '8px',
+    padding: '20px',
+    marginTop: '12px',
+  },
+  flowItem: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    fontSize: '14px',
+  },
+  flowState: {
+    padding: '4px 12px',
+    background: '#e5e7eb',
+    borderRadius: '4px',
+    fontWeight: 500,
+    color: '#374151',
+  },
+  flowAction: {
+    color: '#2563eb',
+    fontStyle: 'italic',
+  },
+  flowArrow: {
+    color: '#9ca3af',
+    fontSize: '16px',
+  },
+  flowNote: {
+    fontSize: '13px',
+    color: '#6b7280',
+    marginTop: '12px',
+    marginBottom: 0,
+  },
+  blockNote: {
+    fontSize: '14px',
+    color: '#4b5563',
+    marginBottom: '8px',
+  },
+  blockedList: {
+    margin: '0 0 12px 0',
     paddingLeft: '20px',
     fontSize: '14px',
     color: '#4b5563',

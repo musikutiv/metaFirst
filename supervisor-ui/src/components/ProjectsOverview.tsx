@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { Project, Supervisor } from '../types';
+import { StatusBadge, getRDMPStatus, type RDMPStatus } from './StatusBadge';
 
 interface ProjectWithDetails extends Project {
   supervisorName?: string;
   activeRdmpTitle?: string | null;
+  rdmpStatus: RDMPStatus;
   userRole?: string;
 }
 
@@ -34,36 +36,31 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       const supervisorMap = new Map<number, Supervisor>();
       supervisorsData.forEach((s) => supervisorMap.set(s.id, s));
 
-      // For each project, get active RDMP and enrich with supervisor info
+      // For each project, get RDMP status and enrich with supervisor info
       const enrichedProjects: ProjectWithDetails[] = await Promise.all(
         projectsData.map(async (project) => {
           const supervisor = supervisorMap.get(project.supervisor_id);
 
-          // Get active RDMP for this project
+          // Get all RDMPs for this project to determine status
           let activeRdmpTitle: string | null = null;
+          let rdmpStatus: RDMPStatus = 'NONE';
           try {
-            const activeRdmp = await apiClient.getActiveRDMP(project.id);
+            const rdmps = await apiClient.listRDMPVersions(project.id);
+            rdmpStatus = getRDMPStatus(rdmps);
+            const activeRdmp = rdmps.find(r => r.status === 'ACTIVE');
             activeRdmpTitle = activeRdmp?.title || null;
           } catch {
-            // Ignore errors - project might not have an active RDMP
+            // Ignore errors - project might not have any RDMPs
           }
 
           // Get user's role from supervisor members (if available)
           let userRole: string | undefined;
           if (supervisor) {
             try {
-              const members = await apiClient.getSupervisorMembers(supervisor.id);
-              // We don't have current user ID here, but the API returns only
-              // members for supervisors the user belongs to, so any member data
-              // indicates access. For role display, we'd need the user ID.
-              // For now, show the first role found (supervisor-scoped)
-              if (members.length > 0) {
-                // Find current user's role - this is a simplification
-                // In a real app, we'd pass the user ID or get it from context
-                userRole = members[0]?.role;
-              }
+              const roleInfo = await apiClient.getMyLabRole(supervisor.id);
+              userRole = roleInfo.role ?? undefined;
             } catch {
-              // Ignore - user might not have access to list members
+              // Ignore - user might not have access
             }
           }
 
@@ -71,6 +68,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
             ...project,
             supervisorName: supervisor?.name,
             activeRdmpTitle,
+            rdmpStatus,
             userRole,
           };
         })
@@ -138,11 +136,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
             <div key={project.id} style={styles.projectCard}>
               <div style={styles.cardHeader}>
                 <h3 style={styles.projectName}>{project.name}</h3>
-                {project.activeRdmpTitle ? (
-                  <span style={styles.activeBadge}>Active RDMP</span>
-                ) : (
-                  <span style={styles.inactiveBadge}>No Active RDMP</span>
-                )}
+                <StatusBadge type="rdmp" status={project.rdmpStatus} />
               </div>
 
               {project.description && (
@@ -151,7 +145,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
 
               <div style={styles.cardDetails}>
                 <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Supervisor:</span>
+                  <span style={styles.detailLabel}>Lab:</span>
                   <span style={styles.detailValue}>
                     {project.supervisorName || 'Unknown'}
                     <button
@@ -165,12 +159,14 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                     </button>
                   </span>
                 </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Active RDMP:</span>
-                  <span style={styles.detailValue}>
-                    {project.activeRdmpTitle || '-'}
-                  </span>
-                </div>
+                {project.activeRdmpTitle && (
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Active RDMP:</span>
+                    <span style={styles.detailValue}>
+                      {project.activeRdmpTitle}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <button
@@ -260,24 +256,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#111827',
     margin: 0,
-  },
-  activeBadge: {
-    padding: '4px 10px',
-    fontSize: '12px',
-    fontWeight: 500,
-    background: '#d1fae5',
-    color: '#065f46',
-    borderRadius: '9999px',
-    whiteSpace: 'nowrap',
-  },
-  inactiveBadge: {
-    padding: '4px 10px',
-    fontSize: '12px',
-    fontWeight: 500,
-    background: '#fef3c7',
-    color: '#92400e',
-    borderRadius: '9999px',
-    whiteSpace: 'nowrap',
   },
   description: {
     fontSize: '14px',

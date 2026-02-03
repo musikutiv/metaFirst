@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import type { Project, RDMPVersion, LabRole } from '../types';
 import { PermissionHint, hasPermission } from './PermissionHint';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface RDMPManagementProps {
   project: Project;
@@ -29,6 +30,9 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
 
   // Activating state
   const [activatingId, setActivatingId] = useState<number | null>(null);
+
+  // Confirmation dialog state
+  const [confirmActivate, setConfirmActivate] = useState<RDMPVersion | null>(null);
 
   // Reset state when project changes to prevent showing stale data
   useEffect(() => {
@@ -124,24 +128,30 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
     }
   };
 
-  const handleActivate = async (rdmpId: number) => {
-    if (!confirm('Activate this RDMP? Any currently active RDMP will be superseded.')) {
-      return;
-    }
+  const handleActivateClick = (rdmp: RDMPVersion) => {
+    setConfirmActivate(rdmp);
+  };
+
+  const handleActivateConfirm = async () => {
+    if (!confirmActivate) return;
 
     setError(null);
-    setActivatingId(rdmpId);
+    setActivatingId(confirmActivate.id);
 
     try {
-      const activatedRDMP = await apiClient.activateRDMP(rdmpId);
+      const activatedRDMP = await apiClient.activateRDMP(confirmActivate.id);
+      setConfirmActivate(null);
       await loadRDMPs();
       onRDMPActivated?.(activatedRDMP);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to activate RDMP');
+      setConfirmActivate(null);
     } finally {
       setActivatingId(null);
     }
   };
+
+  const hasActiveRDMP = rdmps.some(r => r.status === 'ACTIVE');
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
@@ -234,11 +244,48 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
         </form>
       )}
 
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmActivate !== null}
+        title="Activate RDMP"
+        message={`Are you sure you want to activate "${confirmActivate?.title}"?`}
+        consequences={
+          hasActiveRDMP
+            ? [
+                'The current active RDMP will be superseded',
+                'This project will use the new RDMP for all future operations',
+                'This action cannot be undone',
+              ]
+            : [
+                'This project will become operational',
+                'Data ingestion will be enabled',
+                'This action cannot be undone',
+              ]
+        }
+        confirmLabel="Activate RDMP"
+        variant="warning"
+        onConfirm={handleActivateConfirm}
+        onCancel={() => setConfirmActivate(null)}
+        loading={activatingId !== null}
+      />
+
       {/* RDMP List */}
       {rdmps.length === 0 ? (
         <div style={styles.empty}>
-          <p>No RDMPs found for this project.</p>
-          <p style={styles.emptyHint}>Create a new draft to get started.</p>
+          <div style={styles.emptyIcon}>&#128203;</div>
+          <p style={styles.emptyTitle}>No RDMP Found</p>
+          <p style={styles.emptyText}>
+            This project needs an RDMP (Research Data Management Plan) to become operational.
+            Create a draft and have a PI activate it to enable data ingestion.
+          </p>
+          {!showCreateForm && (
+            <button
+              style={styles.emptyButton}
+              onClick={() => setShowCreateForm(true)}
+            >
+              Create RDMP Draft
+            </button>
+          )}
         </div>
       ) : (
         <div style={styles.list}>
@@ -316,7 +363,7 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
                             ...styles.activateButton,
                             ...(canActivate ? {} : styles.disabledButton),
                           }}
-                          onClick={() => handleActivate(rdmp.id)}
+                          onClick={() => handleActivateClick(rdmp)}
                           disabled={activatingId === rdmp.id || !canActivate}
                           title={canActivate ? undefined : 'Requires: PI'}
                         >
@@ -458,12 +505,37 @@ const styles: Record<string, React.CSSProperties> = {
   },
   empty: {
     textAlign: 'center',
-    padding: '40px',
-    color: '#6b7280',
+    padding: '48px 24px',
+    background: '#f9fafb',
+    borderRadius: '8px',
+    border: '1px dashed #d1d5db',
   },
-  emptyHint: {
+  emptyIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+  },
+  emptyTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#374151',
+    margin: '0 0 8px 0',
+  },
+  emptyText: {
     fontSize: '14px',
-    marginTop: '8px',
+    color: '#6b7280',
+    maxWidth: '400px',
+    margin: '0 auto 20px auto',
+    lineHeight: 1.5,
+  },
+  emptyButton: {
+    padding: '10px 20px',
+    fontSize: '14px',
+    fontWeight: 500,
+    background: '#2563eb',
+    border: 'none',
+    borderRadius: '6px',
+    color: '#fff',
+    cursor: 'pointer',
   },
   list: {
     display: 'flex',
