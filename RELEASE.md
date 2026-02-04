@@ -1,5 +1,34 @@
 # Release Notes
 
+## v0.4.0 — Usability, Onboarding, Remediation UX Polish
+
+**Release date:** 2026-02-04
+
+This release focuses on improving user experience, clarity, and discoverability throughout the application.
+
+**Highlights:**
+- Lab terminology consistency (replaced "Supervisor" with "Lab" in all user-facing text)
+- Role clarity surfaces with RoleBadge and PermissionHint components
+- Project state & RDMP visibility with StatusBadge and ProjectStatusCallout
+- Lab onboarding checklist for PI/STEWARD roles
+- Advisory remediation tasks with grouped priorities (Urgent/Recommended/Completed)
+- Accessibility improvements (keyboard navigation, ARIA attributes, screen reader support)
+- Enhanced documentation for roles, RDMP lifecycle, and remediation workflow
+
+**New Components:**
+- `RoleBadge` — displays user's current role
+- `PermissionHint` — explains restricted actions
+- `StatusBadge` — RDMP status indicator
+- `ProjectStatusCallout` — actionable guidance based on project state
+- `LabOnboardingChecklist` — setup progress tracker
+- `RemediationTaskList` — advisory task management
+- `ConfirmDialog` — accessible confirmation dialogs
+
+**Testing:**
+- 54 tests covering all new components
+
+---
+
 ## v0.3.1 — Project Lifecycle and Governance UI
 
 **Release date:** 2026-02-02
