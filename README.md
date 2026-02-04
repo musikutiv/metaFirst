@@ -150,3 +150,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design, components, interaction flows
 - [ingest_helper/README.md](ingest_helper/README.md) — ingest helper configuration and usage
 - [supervisor/supervisor/discovery/](supervisor/supervisor/discovery/) — federated discovery index module
+
+## Roadmap: v0.5 focus
+
+v0.5 focuses on operational maturity: auditability (who did what, when, why), day-2 lab operations, governance transparency, and clearer remediation posture. See [docs/releases/v0.5.0-scope.md](docs/releases/v0.5.0-scope.md) for the scoped themes and the multi-sample ingestion MVP details.
