@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+
 /**
  * ConfirmDialog - Modal dialog for confirming irreversible actions.
  */
@@ -10,9 +12,12 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   variant?: 'default' | 'warning' | 'danger';
-  onConfirm: () => void;
+  onConfirm: (reason?: string) => void;
   onCancel: () => void;
   loading?: boolean;
+  requireReason?: boolean;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
 }
 
 const variantStyles = {
@@ -41,10 +46,27 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   loading = false,
+  requireReason = false,
+  reasonLabel = 'Reason',
+  reasonPlaceholder = 'Enter a reason for this action...',
 }: ConfirmDialogProps) {
+  const [reason, setReason] = useState('');
+
+  // Reset reason when dialog opens
+  useEffect(() => {
+    if (open) {
+      setReason('');
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const colors = variantStyles[variant];
+  const canConfirm = !requireReason || reason.trim().length > 0;
+
+  const handleConfirm = () => {
+    onConfirm(requireReason ? reason.trim() : undefined);
+  };
 
   return (
     <div style={styles.overlay} onClick={onCancel}>
@@ -71,6 +93,19 @@ export function ConfirmDialog({
           </div>
         )}
 
+        {requireReason && (
+          <div style={styles.reasonContainer}>
+            <label style={styles.reasonLabel}>{reasonLabel} (required)</label>
+            <textarea
+              style={styles.reasonInput}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={reasonPlaceholder}
+              rows={3}
+            />
+          </div>
+        )}
+
         <div style={styles.actions}>
           <button
             style={styles.cancelButton}
@@ -83,9 +118,10 @@ export function ConfirmDialog({
             style={{
               ...styles.confirmButton,
               background: colors.confirmBg,
+              ...(canConfirm ? {} : { opacity: 0.5, cursor: 'not-allowed' }),
             }}
-            onClick={onConfirm}
-            disabled={loading}
+            onClick={handleConfirm}
+            disabled={loading || !canConfirm}
           >
             {loading ? 'Processing...' : confirmLabel}
           </button>
@@ -170,5 +206,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     color: '#fff',
     cursor: 'pointer',
+  },
+  reasonContainer: {
+    marginBottom: '20px',
+  },
+  reasonLabel: {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: 500,
+    color: '#374151',
+    marginBottom: '8px',
+  },
+  reasonInput: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    boxSizing: 'border-box' as const,
+    resize: 'vertical' as const,
   },
 };

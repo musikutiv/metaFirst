@@ -132,14 +132,14 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
     setConfirmActivate(rdmp);
   };
 
-  const handleActivateConfirm = async () => {
-    if (!confirmActivate) return;
+  const handleActivateConfirm = async (reason?: string) => {
+    if (!confirmActivate || !reason) return;
 
     setError(null);
     setActivatingId(confirmActivate.id);
 
     try {
-      const activatedRDMP = await apiClient.activateRDMP(confirmActivate.id);
+      const activatedRDMP = await apiClient.activateRDMP(confirmActivate.id, reason);
       setConfirmActivate(null);
       await loadRDMPs();
       onRDMPActivated?.(activatedRDMP);
@@ -267,6 +267,9 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
         onConfirm={handleActivateConfirm}
         onCancel={() => setConfirmActivate(null)}
         loading={activatingId !== null}
+        requireReason
+        reasonLabel="Reason for activation"
+        reasonPlaceholder="e.g., Initial RDMP for project launch, or Updated data retention policy..."
       />
 
       {/* RDMP List */}

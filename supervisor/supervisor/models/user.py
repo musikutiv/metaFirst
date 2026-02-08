@@ -24,6 +24,7 @@ class User(Base):
     storage_mappings = relationship("StorageRootMapping", back_populates="user")
     created_projects = relationship("Project", back_populates="creator", foreign_keys="[Project.created_by]")
     audit_logs = relationship("AuditLog", back_populates="actor", foreign_keys="[AuditLog.actor_user_id]")
+    activity_logs = relationship("LabActivityLog", back_populates="actor", foreign_keys="[LabActivityLog.actor_user_id]")
 
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}')>"

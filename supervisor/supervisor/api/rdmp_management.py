@@ -11,6 +11,7 @@ from supervisor.models.project import Project
 from supervisor.models.rdmp import RDMPVersion, RDMPStatus
 from supervisor.models.supervisor_membership import SupervisorRole
 from supervisor.api.deps import get_current_active_user, require_supervisor_role
+from supervisor.services.lab_activity_service import log_rdmp_activated
 
 router = APIRouter()
 
@@ -29,6 +30,11 @@ class RDMPUpdate(BaseModel):
     """Schema for updating an RDMP draft."""
     title: str | None = Field(default=None, min_length=1, max_length=255)
     content: dict | None = Field(default=None)
+
+
+class RDMPActivateRequest(BaseModel):
+    """Schema for activating an RDMP."""
+    reason: str = Field(..., min_length=1, max_length=1000, description="Justification for activating this RDMP")
 
 
 class RDMPRead(BaseModel):
@@ -304,6 +310,7 @@ def update_rdmp(
 )
 def activate_rdmp(
     rdmp_id: int,
+    activate_data: RDMPActivateRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
@@ -311,6 +318,7 @@ def activate_rdmp(
 
     Only PI can activate RDMPs.
     Any previously ACTIVE RDMP becomes SUPERSEDED.
+    Requires a reason/justification for the activation.
     """
     rdmp = db.query(RDMPVersion).filter(RDMPVersion.id == rdmp_id).first()
     if not rdmp:
@@ -327,12 +335,26 @@ def activate_rdmp(
 
     # Supersede any existing ACTIVE RDMP
     existing_active = _get_active_rdmp(db, rdmp.project_id)
+    superseded_rdmp_id = existing_active.id if existing_active else None
     if existing_active:
         existing_active.status = RDMPStatus.SUPERSEDED
 
     # Activate this RDMP
     rdmp.status = RDMPStatus.ACTIVE
     rdmp.approved_by = current_user.id
+
+    # Log activity
+    log_rdmp_activated(
+        db=db,
+        lab_id=project.supervisor_id,
+        actor_user_id=current_user.id,
+        rdmp_id=rdmp.id,
+        project_name=project.name,
+        rdmp_title=rdmp.title or "Untitled",
+        version=rdmp.version_int,
+        reason_text=activate_data.reason,
+        superseded_rdmp_id=superseded_rdmp_id,
+    )
 
     db.commit()
     db.refresh(rdmp)

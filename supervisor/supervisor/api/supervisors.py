@@ -2,7 +2,7 @@
 
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from supervisor.database import get_db
@@ -15,6 +15,11 @@ from supervisor.schemas.supervisor import (
     SupervisorUpdate,
 )
 from supervisor.api.deps import get_current_active_user, require_supervisor_role
+from supervisor.services.lab_activity_service import (
+    log_member_added,
+    log_member_role_changed,
+    log_member_removed,
+)
 
 
 class SupervisorMemberResponse(BaseModel):
@@ -37,6 +42,7 @@ class SupervisorMemberCreate(BaseModel):
 class SupervisorMemberUpdate(BaseModel):
     """Update supervisor member role."""
     role: str  # PI, STEWARD, or RESEARCHER
+    reason: str = Field(..., min_length=1, max_length=1000, description="Justification for role change")
 
 router = APIRouter()
 
@@ -275,6 +281,17 @@ def add_supervisor_member(
         created_by=current_user.id
     )
     db.add(membership)
+
+    # Log activity
+    log_member_added(
+        db=db,
+        lab_id=supervisor_id,
+        actor_user_id=current_user.id,
+        member_user_id=user.id,
+        member_name=user.display_name or user.username,
+        role=role.value,
+    )
+
     db.commit()
 
     return SupervisorMemberResponse(
@@ -329,8 +346,24 @@ def update_supervisor_member(
     # Get user info
     user = db.query(User).filter(User.id == user_id).first()
 
+    # Capture old role for logging
+    old_role = membership.role.value
+
     # Update role
     membership.role = new_role
+
+    # Log activity
+    log_member_role_changed(
+        db=db,
+        lab_id=supervisor_id,
+        actor_user_id=current_user.id,
+        member_user_id=user.id,
+        member_name=user.display_name or user.username,
+        old_role=old_role,
+        new_role=new_role.value,
+        reason_text=member_data.reason,
+    )
+
     db.commit()
 
     return SupervisorMemberResponse(
@@ -388,5 +421,20 @@ def remove_supervisor_member(
                 detail="Cannot remove the last PI from a supervisor"
             )
 
+    # Get user info for logging
+    user = db.query(User).filter(User.id == user_id).first()
+    old_role = membership.role.value
+
     db.delete(membership)
+
+    # Log activity
+    log_member_removed(
+        db=db,
+        lab_id=supervisor_id,
+        actor_user_id=current_user.id,
+        member_user_id=user_id,
+        member_name=user.display_name or user.username if user else f"User {user_id}",
+        old_role=old_role,
+    )
+
     db.commit()
