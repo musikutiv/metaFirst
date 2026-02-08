@@ -193,6 +193,34 @@ export interface LabRoleInfo {
   role: LabRole | null;
 }
 
+// Lab Activity Log
+export interface ActivityLogEntry {
+  id: number;
+  lab_id: number;
+  created_at: string;
+  actor_user_id: number;
+  actor_display_name: string | null;
+  event_type: string;
+  entity_type: string;
+  entity_id: number;
+  summary_text: string;
+  reason_text: string | null;
+  before_json: Record<string, unknown> | null;
+  after_json: Record<string, unknown> | null;
+}
+
+export interface ActivityLogListResponse {
+  items: ActivityLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EventTypeOption {
+  value: string;
+  label: string;
+}
+
 // Remediation tasks (advisory, non-destructive)
 export type RemediationPriority = 'urgent' | 'recommended' | 'completed';
 

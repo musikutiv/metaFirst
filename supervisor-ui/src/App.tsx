@@ -15,6 +15,7 @@ import { CreateProjectWizard } from './components/CreateProjectWizard';
 import { ProjectStatusCallout } from './components/ProjectStatusCallout';
 import { hasPermission } from './components/PermissionHint';
 import { SupervisorMembers } from './components/SupervisorMembers';
+import { LabActivity } from './components/LabActivity';
 import { ProjectsOverview } from './components/ProjectsOverview';
 import { RolesAndPermissions } from './components/RolesAndPermissions';
 import { RemediationTaskList } from './components/RemediationTaskList';
@@ -353,7 +354,7 @@ function App() {
 
   return (
     <div style={styles.app}>
-      <Header user={user} onLogout={handleLogout} labName={labName} userRole={userRole} />
+      <Header user={user} onLogout={handleLogout} labName={labName} userRole={userRole} supervisorId={selectedProject?.supervisor_id ?? null} />
 
       <main style={styles.main}>
         <Routes>
@@ -374,6 +375,12 @@ function App() {
           <Route
             path="/supervisors/:supervisorId/members"
             element={<SupervisorMembers />}
+          />
+
+          {/* Lab Activity Log */}
+          <Route
+            path="/supervisors/:supervisorId/activity"
+            element={<LabActivity />}
           />
 
           {/* Roles and Permissions documentation */}

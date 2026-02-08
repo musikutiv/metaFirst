@@ -30,6 +30,9 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
   const [rdmpTitle, setRdmpTitle] = useState('');
   const [rdmpContent, setRdmpContent] = useState('{\n  "fields": [],\n  "roles": []\n}');
 
+  // Step 3: Activation state
+  const [activationReason, setActivationReason] = useState('');
+
   // Common state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,12 +122,16 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
 
   const handleActivate = async () => {
     if (!createdRDMP || !createdProject) return;
+    if (!activationReason.trim()) {
+      setActivationError('Please provide a reason for activation');
+      return;
+    }
 
     setActivationError(null);
     setSubmitting(true);
 
     try {
-      const activatedRDMP = await apiClient.activateRDMP(createdRDMP.id);
+      const activatedRDMP = await apiClient.activateRDMP(createdRDMP.id, activationReason.trim());
       // Notify parent about the activated RDMP immediately
       onRDMPActivated?.(activatedRDMP);
       // Success - close wizard and navigate to project
@@ -313,6 +320,20 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
             </div>
           </div>
 
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Reason for Activation *</label>
+            <textarea
+              style={styles.textarea}
+              value={activationReason}
+              onChange={(e) => setActivationReason(e.target.value)}
+              placeholder="e.g., Initial project setup, ready for data collection..."
+              rows={3}
+            />
+            <p style={styles.hint}>
+              A reason is required for audit purposes.
+            </p>
+          </div>
+
           {activationError && <div style={styles.error}>{activationError}</div>}
 
           <div style={styles.actions}>
@@ -326,9 +347,12 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
             </button>
             <button
               type="button"
-              style={styles.primaryButton}
+              style={{
+                ...styles.primaryButton,
+                ...(activationReason.trim() ? {} : { opacity: 0.5, cursor: 'not-allowed' }),
+              }}
               onClick={handleActivate}
-              disabled={submitting}
+              disabled={submitting || !activationReason.trim()}
             >
               {submitting ? 'Activating...' : 'Activate RDMP'}
             </button>

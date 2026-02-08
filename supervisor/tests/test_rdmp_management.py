@@ -196,6 +196,7 @@ class TestRDMPActivation:
         headers = get_auth_headers(client, "pi_user")
         response = client.post(
             f"/api/rdmps/{rdmp_id}/activate",
+            json={"reason": "Test activation"},
             headers=headers,
         )
 
@@ -220,6 +221,7 @@ class TestRDMPActivation:
         # Try to activate as steward
         response = client.post(
             f"/api/rdmps/{rdmp_id}/activate",
+            json={"reason": "Test activation"},
             headers=headers,
         )
 
@@ -237,7 +239,7 @@ class TestRDMPActivation:
             headers=pi_headers,
         )
         first_rdmp_id = response.json()["id"]
-        client.post(f"/api/rdmps/{first_rdmp_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{first_rdmp_id}/activate", json={"reason": "First activation"}, headers=pi_headers)
 
         # Create and activate second RDMP
         response = client.post(
@@ -246,7 +248,7 @@ class TestRDMPActivation:
             headers=pi_headers,
         )
         second_rdmp_id = response.json()["id"]
-        client.post(f"/api/rdmps/{second_rdmp_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{second_rdmp_id}/activate", json={"reason": "Superseding first"}, headers=pi_headers)
 
         # Verify first is SUPERSEDED, second is ACTIVE
         response = client.get(f"/api/rdmps/{first_rdmp_id}", headers=pi_headers)
@@ -302,7 +304,7 @@ class TestRDMPActivationScoping:
             headers=pi_headers,
         )
         rdmp_a_id = response.json()["id"]
-        client.post(f"/api/rdmps/{rdmp_a_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{rdmp_a_id}/activate", json={"reason": "Initial activation A"}, headers=pi_headers)
 
         # Create and activate RDMP in project B
         response = client.post(
@@ -311,7 +313,7 @@ class TestRDMPActivationScoping:
             headers=pi_headers,
         )
         rdmp_b_id = response.json()["id"]
-        client.post(f"/api/rdmps/{rdmp_b_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{rdmp_b_id}/activate", json={"reason": "Initial activation B"}, headers=pi_headers)
 
         # Verify both RDMPs are ACTIVE
         response = client.get(f"/api/rdmps/{rdmp_a_id}", headers=pi_headers)
@@ -327,7 +329,7 @@ class TestRDMPActivationScoping:
             headers=pi_headers,
         )
         rdmp_a_v2_id = response.json()["id"]
-        client.post(f"/api/rdmps/{rdmp_a_v2_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{rdmp_a_v2_id}/activate", json={"reason": "Supersede in A"}, headers=pi_headers)
 
         # Verify: Project A's first RDMP should be SUPERSEDED
         response = client.get(f"/api/rdmps/{rdmp_a_id}", headers=pi_headers)
@@ -386,7 +388,7 @@ class TestRDMPActivationScoping:
             headers=pi_headers,
         )
         rdmp_a_id = response.json()["id"]
-        client.post(f"/api/rdmps/{rdmp_a_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{rdmp_a_id}/activate", json={"reason": "Active endpoint test"}, headers=pi_headers)
 
         # Project A should have active RDMP
         response = client.get(f"/api/projects/{project_a.id}/rdmps/active", headers=pi_headers)
@@ -422,7 +424,7 @@ class TestIngestRunRDMPProvenance:
             headers=pi_headers,
         )
         rdmp_id = response.json()["id"]
-        client.post(f"/api/rdmps/{rdmp_id}/activate", headers=pi_headers)
+        client.post(f"/api/rdmps/{rdmp_id}/activate", json={"reason": "Provenance test"}, headers=pi_headers)
 
         # Create ingest run
         response = client.post(

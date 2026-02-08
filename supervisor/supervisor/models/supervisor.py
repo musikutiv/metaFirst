@@ -46,6 +46,7 @@ class Supervisor(Base):
     projects = relationship("Project", back_populates="supervisor", cascade="all, delete-orphan")
     memberships = relationship("SupervisorMembership", back_populates="supervisor", cascade="all, delete-orphan")
     primary_steward = relationship("User", foreign_keys=[primary_steward_user_id])
+    activity_logs = relationship("LabActivityLog", back_populates="lab", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Supervisor(id={self.id}, name='{self.name}')>"
