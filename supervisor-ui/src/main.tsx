@@ -61,6 +61,16 @@ class ErrorBoundary extends React.Component<
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    {import.meta.env.DEV && (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0,
+        background: '#f59e0b', color: '#000', textAlign: 'center',
+        padding: '4px 0', fontSize: '12px', fontWeight: 'bold',
+        zIndex: 99999,
+      }}>
+        DEVELOPMENT MODE
+      </div>
+    )}
     <ErrorBoundary>
       <BrowserRouter>
         <App />
