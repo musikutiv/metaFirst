@@ -153,6 +153,9 @@ export function SupervisorMembers() {
               </span>
             )}
           </p>
+          <p style={styles.roleNote}>
+            Roles are Lab-scoped. Your effective role is your highest stored Lab role.
+          </p>
         </div>
       </div>
 
@@ -162,7 +165,12 @@ export function SupervisorMembers() {
       <div style={styles.addForm}>
         <h3 style={styles.sectionTitle}>
           Add Member
-          {!canAddMember && <PermissionHint requiredRole={['STEWARD', 'PI']} inline />}
+          <PermissionHint
+            requiredRole={['STEWARD', 'PI']}
+            userRole={currentUserRole}
+            supervisorId={supervisorId ? parseInt(supervisorId) : undefined}
+            inline
+          />
         </h3>
         <form onSubmit={handleAddMember} style={styles.form}>
           <input
@@ -266,7 +274,7 @@ export function SupervisorMembers() {
                           </div>
                         </div>
                       ) : (
-                        <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             style={{
                               ...styles.editButton,
@@ -274,7 +282,6 @@ export function SupervisorMembers() {
                             }}
                             onClick={() => startEdit(member)}
                             disabled={!canEditRole}
-                            title={canEditRole ? undefined : 'Requires: PI'}
                           >
                             Edit
                           </button>
@@ -285,11 +292,18 @@ export function SupervisorMembers() {
                             }}
                             onClick={() => handleRemoveMember(member.user_id, member.username)}
                             disabled={!canRemoveMember}
-                            title={canRemoveMember ? undefined : 'Requires: PI'}
                           >
                             Remove
                           </button>
-                        </>
+                          {!canEditRole && (
+                            <PermissionHint
+                              requiredRole="PI"
+                              userRole={currentUserRole}
+                              supervisorId={supervisorId ? parseInt(supervisorId) : undefined}
+                              inline
+                            />
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -479,6 +493,12 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'not-allowed',
     color: '#9ca3af',
     borderColor: '#e5e7eb',
+  },
+roleNote: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '8px',
+    fontStyle: 'italic',
   },
   reasonInput: {
     padding: '6px 10px',

@@ -439,6 +439,7 @@ function App() {
                         projectId={selectedProject.id}
                         rdmpStatus={activeRDMP ? 'ACTIVE' : 'NONE'}
                         canActivate={hasPermission(userRole, 'PI')}
+                        userRole={userRole}
                       />
                     )}
 

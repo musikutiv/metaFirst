@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import type { RDMPStatus } from './StatusBadge';
+import type { LabRole } from '../types';
 
 interface ProjectStatusCalloutProps {
   projectId: number;
   rdmpStatus: RDMPStatus;
   /** Whether the current user can activate RDMPs (PI only) */
   canActivate?: boolean;
+  /** Current user's lab role, for authority hints in action text. */
+  userRole?: LabRole | null;
 }
 
 interface StatusInfo {
@@ -86,13 +89,14 @@ const typeStyles = {
   },
 };
 
-export function ProjectStatusCallout({ projectId, rdmpStatus, canActivate = false }: ProjectStatusCalloutProps) {
+export function ProjectStatusCallout({ projectId, rdmpStatus, canActivate = false, userRole }: ProjectStatusCalloutProps) {
   const navigate = useNavigate();
   const info = getStatusInfo(rdmpStatus, projectId, canActivate);
   const style = typeStyles[info.type];
 
-  // Don't show callout for operational projects unless needed
-  // if (rdmpStatus === 'ACTIVE') return null;
+  // Authority hint for non-operational states where activation is needed
+  const showAuthorityHint =
+    rdmpStatus !== 'ACTIVE' && !canActivate && userRole;
 
   return (
     <div
@@ -122,6 +126,11 @@ export function ProjectStatusCallout({ projectId, rdmpStatus, canActivate = fals
           <div style={{ fontSize: '13px', color: style.textColor, marginTop: '2px' }}>
             {info.description}
           </div>
+          {showAuthorityHint && (
+            <div style={{ fontSize: '12px', color: '#b45309', marginTop: '4px' }}>
+              RDMP activation requires PI. You have: {userRole}.
+            </div>
+          )}
         </div>
       </div>
       <button

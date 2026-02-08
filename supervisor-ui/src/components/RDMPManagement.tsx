@@ -368,11 +368,10 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
                           }}
                           onClick={() => handleActivateClick(rdmp)}
                           disabled={activatingId === rdmp.id || !canActivate}
-                          title={canActivate ? undefined : 'Requires: PI'}
                         >
                           {activatingId === rdmp.id ? 'Activating...' : 'Activate'}
                         </button>
-                        {!canActivate && <PermissionHint requiredRole="PI" inline />}
+                        <PermissionHint requiredRole="PI" userRole={userRole} inline />
                       </>
                     )}
                     {rdmp.status === 'ACTIVE' && (

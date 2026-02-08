@@ -6,32 +6,72 @@ describe('PermissionHint', () => {
   it('renders single role requirement', () => {
     render(<PermissionHint requiredRole="PI" />);
     const hint = screen.getByTestId('permission-hint');
-    expect(hint).toHaveTextContent('Requires: PI');
+    expect(hint).toHaveTextContent('Requires PI');
   });
 
-  it('renders multiple role requirements with "or"', () => {
+  it('renders multiple role requirements as "Role+"', () => {
     render(<PermissionHint requiredRole={['STEWARD', 'PI']} />);
     const hint = screen.getByTestId('permission-hint');
-    expect(hint).toHaveTextContent('Requires: STEWARD or PI');
+    expect(hint).toHaveTextContent('Requires STEWARD+');
   });
 
-  it('renders single role from array without "or"', () => {
+  it('renders single role from array without "+"', () => {
     render(<PermissionHint requiredRole={['PI']} />);
     const hint = screen.getByTestId('permission-hint');
-    expect(hint).toHaveTextContent('Requires: PI');
+    expect(hint).toHaveTextContent('Requires PI');
   });
 
   it('renders in inline mode with parentheses', () => {
     render(<PermissionHint requiredRole="PI" inline />);
     const hint = screen.getByTestId('permission-hint');
-    expect(hint).toHaveTextContent('(Requires: PI)');
+    expect(hint).toHaveTextContent('(Requires PI)');
   });
 
   it('renders in block mode without parentheses', () => {
     render(<PermissionHint requiredRole="PI" inline={false} />);
     const hint = screen.getByTestId('permission-hint');
-    expect(hint).toHaveTextContent('Requires: PI');
+    expect(hint).toHaveTextContent('Requires PI');
     expect(hint.textContent).not.toContain('(');
+  });
+
+  describe('with userRole', () => {
+    it('shows subtle hint when user has permission', () => {
+      render(<PermissionHint requiredRole="PI" userRole="PI" />);
+      const hint = screen.getByTestId('permission-hint');
+      expect(hint).toHaveTextContent('Requires PI');
+      expect(hint).not.toHaveAttribute('data-denied');
+    });
+
+    it('shows denied state when user lacks permission', () => {
+      render(<PermissionHint requiredRole="PI" userRole="RESEARCHER" />);
+      const hint = screen.getByTestId('permission-hint');
+      expect(hint).toHaveTextContent('Requires PI');
+      expect(hint).toHaveTextContent('you have RESEARCHER');
+      expect(hint).toHaveAttribute('data-denied', 'true');
+    });
+
+    it('shows denied state for Steward when PI required', () => {
+      render(<PermissionHint requiredRole="PI" userRole="STEWARD" />);
+      const hint = screen.getByTestId('permission-hint');
+      expect(hint).toHaveTextContent('you have STEWARD');
+      expect(hint).toHaveAttribute('data-denied', 'true');
+    });
+
+    it('shows "Request role change" link when supervisorId provided', () => {
+      render(
+        <PermissionHint requiredRole="PI" userRole="RESEARCHER" supervisorId={42} />
+      );
+      const hint = screen.getByTestId('permission-hint');
+      const link = hint.querySelector('a');
+      expect(link).toHaveAttribute('href', '/supervisors/42/members');
+      expect(link).toHaveTextContent('Request role change');
+    });
+
+    it('shows fallback text when supervisorId not provided', () => {
+      render(<PermissionHint requiredRole="PI" userRole="RESEARCHER" />);
+      const hint = screen.getByTestId('permission-hint');
+      expect(hint).toHaveTextContent('Request role change from PI.');
+    });
   });
 });
 

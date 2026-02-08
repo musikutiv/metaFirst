@@ -238,3 +238,34 @@ export interface RemediationTask {
   entityId?: number;
   entityName?: string;
 }
+
+// Lab status summary (from GET /supervisors/{id}/status-summary)
+export interface NeedsAttentionItem {
+  type: string;
+  severity: 'info' | 'warning' | 'high';
+  count: number;
+  entity_type: 'lab' | 'project';
+  entity_ids: number[];
+  message: string;
+}
+
+export interface LabStatusSummary {
+  projects: {
+    total_projects: number;
+    by_operational_state: {
+      operational: number;
+      non_operational: number;
+    };
+    by_rdmp_status: {
+      no_rdmp: number;
+      draft: number;
+      active: number;
+      superseded: number;
+    };
+  };
+  needs_attention: NeedsAttentionItem[];
+  remediation_summary: {
+    total_open: number;
+    by_severity: Record<string, number>;
+  };
+}
