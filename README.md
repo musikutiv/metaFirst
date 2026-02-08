@@ -145,6 +145,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - **Re-seeding is destructive** — Running `--seed` on existing DB deletes and recreates it. Stop uvicorn first.
 - **Discovery push fails** — Set `DISCOVERY_API_KEY` env var before pushing to the discovery index.
 
+## Release Notes
+
+- [v0.5.0](docs/releases/v0.5.0-notes.md) — Auditability MVP, bulk sample import, governance clarity UX
+- [Upgrade Guide](docs/releases/UPGRADING.md) — migration instructions for each version
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design, components, interaction flows
