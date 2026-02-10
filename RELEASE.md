@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.6.0 — (Unreleased)
+
+**Operational / Hardening:**
+- CI workflow: GitHub Actions runs production build and full test suite on PRs to `main` and `release/*`
+- App smoke test: verifies the React tree mounts and renders non-blank UI (prevents blank-page regressions)
+
+---
+
 ## v0.5.1 — Patch: Stability and Production Guards
 
 **Release date:** 2026-02-08
