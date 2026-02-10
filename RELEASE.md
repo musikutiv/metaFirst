@@ -1,6 +1,8 @@
 # Release Notes
 
-## v0.6.0 — (Unreleased)
+## v0.6.0 — CI and Smoke Test
+
+**Release date:** 2026-02-09
 
 **Operational / Hardening:**
 - CI workflow: GitHub Actions runs production build and full test suite on PRs to `main` and `release/*`
