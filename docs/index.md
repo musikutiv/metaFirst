@@ -45,5 +45,5 @@ moving any of your actual data files.
 5. **Search and browse** whenever you need to find a sample or check
    what was recorded.
 
-That's it. If something is unclear, ask the person who set up the
-system — they have the technical details.
+That's it. If someone in your group needs to set up metaFirst from
+scratch, there is a [step-by-step install guide](install).
