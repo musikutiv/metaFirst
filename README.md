@@ -1,5 +1,9 @@
 # metaFirst
 
+**Researcher?** See the [plain-language intro](https://musikutiv.github.io/metaFirst/) ([source](docs/index.md)) — no technical background needed.
+
+---
+
 A metadata-first Research Data Management system for life sciences. Metadata is collected centrally via RDMP-guided forms; raw data remains on user machines and lab storage.
 
 Licensed under the [MIT License](LICENSE).
