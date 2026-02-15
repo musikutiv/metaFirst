@@ -120,7 +120,7 @@ export function RemediationTaskList({ tasks }: RemediationTaskListProps) {
     return (
       <div data-testid="remediation-empty" style={styles.emptyState}>
         <span style={styles.emptyIcon}>✓</span>
-        <p style={styles.emptyText}>No remediation tasks</p>
+        <p style={styles.emptyText}>No suggested clean-up items</p>
         <p style={styles.emptySubtext}>Your project data is well-organized.</p>
       </div>
     );
@@ -132,7 +132,7 @@ export function RemediationTaskList({ tasks }: RemediationTaskListProps) {
       <div style={styles.advisoryHeader} data-testid="advisory-header">
         <div style={styles.advisoryIcon}>ℹ</div>
         <div>
-          <h3 style={styles.advisoryTitle}>Remediation Tasks (Advisory)</h3>
+          <h3 style={styles.advisoryTitle}>Suggested clean-up</h3>
           <p style={styles.advisoryText}>
             These tasks are suggestions to improve your data organization.
             They are non-destructive and will not modify or delete any data automatically.

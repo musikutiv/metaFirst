@@ -42,7 +42,7 @@ describe('RemediationTaskList', () => {
       renderWithRouter(<RemediationTaskList tasks={[]} />);
 
       expect(screen.getByTestId('remediation-empty')).toBeInTheDocument();
-      expect(screen.getByText('No remediation tasks')).toBeInTheDocument();
+      expect(screen.getByText('No suggested clean-up items')).toBeInTheDocument();
       expect(screen.getByText('Your project data is well-organized.')).toBeInTheDocument();
     });
   });
@@ -53,7 +53,7 @@ describe('RemediationTaskList', () => {
       renderWithRouter(<RemediationTaskList tasks={tasks} />);
 
       expect(screen.getByTestId('advisory-header')).toBeInTheDocument();
-      expect(screen.getByText('Remediation Tasks (Advisory)')).toBeInTheDocument();
+      expect(screen.getByText('Suggested clean-up')).toBeInTheDocument();
       expect(screen.getByText(/non-destructive/i)).toBeInTheDocument();
     });
   });

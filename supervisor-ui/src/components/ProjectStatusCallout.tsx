@@ -25,7 +25,7 @@ function getStatusInfo(rdmpStatus: RDMPStatus, projectId: number, canActivate: b
       return {
         type: 'success',
         title: 'Project Operational',
-        description: 'This project has an active RDMP. Data ingestion is enabled.',
+        description: 'This project has an active RDMP. You can add data.',
         actionLabel: 'Manage RDMPs',
         actionPath: `/rdmps?project=${projectId}`,
       };
@@ -33,10 +33,10 @@ function getStatusInfo(rdmpStatus: RDMPStatus, projectId: number, canActivate: b
     case 'DRAFT':
       return {
         type: 'warning',
-        title: 'RDMP Draft Pending',
+        title: 'RDMP draft awaiting activation',
         description: canActivate
-          ? 'Activate the RDMP draft to make this project operational and enable data ingestion.'
-          : 'An RDMP draft exists. Ask a PI to activate it to enable data ingestion.',
+          ? 'Activate the RDMP draft to make this project operational and start adding data.'
+          : 'An RDMP draft exists. Ask a PI to activate it to start adding data.',
         actionLabel: canActivate ? 'Activate RDMP' : 'View RDMP',
         actionPath: `/rdmps?project=${projectId}`,
       };
@@ -54,8 +54,8 @@ function getStatusInfo(rdmpStatus: RDMPStatus, projectId: number, canActivate: b
     default:
       return {
         type: 'error',
-        title: 'RDMP Required',
-        description: 'This project has no RDMP. Create and activate an RDMP to enable data ingestion.',
+        title: 'RDMP needed',
+        description: 'This project has no RDMP. Create and activate an RDMP to start adding data.',
         actionLabel: 'Create RDMP',
         actionPath: `/rdmps?project=${projectId}`,
       };
@@ -128,7 +128,7 @@ export function ProjectStatusCallout({ projectId, rdmpStatus, canActivate = fals
           </div>
           {showAuthorityHint && (
             <div style={{ fontSize: '12px', color: '#b45309', marginTop: '4px' }}>
-              RDMP activation requires PI. You have: {userRole}.
+              RDMP activation needs PI role. You have: {userRole}.
             </div>
           )}
         </div>
