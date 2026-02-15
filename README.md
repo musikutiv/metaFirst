@@ -1,7 +1,7 @@
 # metaFirst
 
-**Researcher?** See the [plain-language intro](https://musikutiv.github.io/metaFirst/) ([source](docs/index.md)) — no technical background needed.
-**Setting up?** Follow the [step-by-step install guide](https://musikutiv.github.io/metaFirst/install) ([source](docs/install.md)).
+**Researcher?** See the [plain-language intro](https://bmc-CompBio.github.io/metaFirst/) ([source](docs/index.md)) — no technical background needed.
+**Setting up?** Follow the [step-by-step install guide](https://bmc-CompBio.github.io/metaFirst/install) ([source](docs/install.md)).
 
 ---
 
