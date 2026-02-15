@@ -25,7 +25,7 @@ Linux.
 Open a terminal and run:
 
 ```
-git clone https://github.com/musikutiv/metaFirst.git
+git clone https://github.com/bmc-CompBio/metaFirst.git
 cd metaFirst
 ```
 
