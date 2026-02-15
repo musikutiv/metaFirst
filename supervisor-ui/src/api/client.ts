@@ -1,4 +1,4 @@
-import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo } from '../types';
+import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo, LabStatusSummary, ActivityLogListResponse, EventTypeOption } from '../types';
 
 const API_BASE = '/api';
 
@@ -98,10 +98,10 @@ class ApiClient {
     });
   }
 
-  async updateSupervisorMember(supervisorId: number, userId: number, role: string): Promise<SupervisorMember> {
+  async updateSupervisorMember(supervisorId: number, userId: number, role: string, reason: string): Promise<SupervisorMember> {
     return this.request<SupervisorMember>(`/supervisors/${supervisorId}/members/${userId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role, reason }),
     });
   }
 
@@ -223,10 +223,36 @@ class ApiClient {
     });
   }
 
-  async activateRDMP(rdmpId: number): Promise<RDMPVersion> {
+  async activateRDMP(rdmpId: number, reason: string): Promise<RDMPVersion> {
     return this.request<RDMPVersion>(`/rdmps/${rdmpId}/activate`, {
       method: 'POST',
+      body: JSON.stringify({ reason }),
     });
+  }
+
+// Lab Status Summary
+  async getLabStatusSummary(supervisorId: number): Promise<LabStatusSummary> {
+    return this.request<LabStatusSummary>(`/supervisors/${supervisorId}/status-summary`);
+  }
+
+  // Lab Activity
+  async getLabActivity(
+    supervisorId: number,
+    options?: { eventTypes?: string; search?: string; limit?: number; offset?: number }
+  ): Promise<ActivityLogListResponse> {
+    const params = new URLSearchParams();
+    if (options?.eventTypes) params.append('event_types', options.eventTypes);
+    if (options?.search) params.append('search', options.search);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    const query = params.toString();
+    return this.request<ActivityLogListResponse>(
+      `/supervisors/${supervisorId}/activity${query ? `?${query}` : ''}`
+    );
+  }
+
+  async getLabActivityEventTypes(supervisorId: number): Promise<EventTypeOption[]> {
+    return this.request<EventTypeOption[]>(`/supervisors/${supervisorId}/activity/event-types`);
   }
 }
 

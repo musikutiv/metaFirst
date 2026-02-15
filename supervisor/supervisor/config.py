@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     federated_index_url: str = "http://localhost:8001"
     federated_index_timeout: int = 5
 
+    # Environment
+    supervisor_env: str = "development"
+
     # CORS
     cors_origins: list[str] = ["http://localhost:5173"]
 

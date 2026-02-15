@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rdm-supervisor"
-version = "0.4.0"
+version = "0.5.1"
 description = "Metadata-first RDM supervisor service"
 requires-python = ">=3.11"
 dependencies = [

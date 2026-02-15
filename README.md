@@ -1,5 +1,10 @@
 # metaFirst
 
+**Researcher?** See the [plain-language intro](https://bmc-CompBio.github.io/metaFirst/) ([source](docs/index.md)) — no technical background needed.
+**Setting up?** Follow the [step-by-step install guide](https://bmc-CompBio.github.io/metaFirst/install) ([source](docs/install.md)).
+
+---
+
 A metadata-first Research Data Management system for life sciences. Metadata is collected centrally via RDMP-guided forms; raw data remains on user machines and lab storage.
 
 Licensed under the [MIT License](LICENSE).
@@ -144,6 +149,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - **Storage root not found** — Storage roots are per-project. Demo seeding creates `LOCAL_DATA`; for real projects, create via API.
 - **Re-seeding is destructive** — Running `--seed` on existing DB deletes and recreates it. Stop uvicorn first.
 - **Discovery push fails** — Set `DISCOVERY_API_KEY` env var before pushing to the discovery index.
+
+## Release Notes
+
+- [v0.5.0](docs/releases/v0.5.0-notes.md) — Auditability MVP, bulk sample import, governance clarity UX
+- [Upgrade Guide](docs/releases/UPGRADING.md) — migration instructions for each version
 
 ## Documentation
 

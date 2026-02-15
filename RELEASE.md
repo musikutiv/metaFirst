@@ -1,5 +1,44 @@
 # Release Notes
 
+## v0.6.0 — CI and Smoke Test
+
+**Release date:** 2026-02-09
+
+**Operational / Hardening:**
+- CI workflow: GitHub Actions runs production build and full test suite on PRs to `main` and `release/*`
+- App smoke test: verifies the React tree mounts and renders non-blank UI (prevents blank-page regressions)
+
+---
+
+## v0.5.1 — Patch: Stability and Production Guards
+
+**Release date:** 2026-02-08
+
+Patch release addressing a production blank-page bug and adding minimal
+production-readiness guards.
+
+**Fixes:**
+- React hooks order violation causing blank page after login (ccb91b7)
+
+**Hardening:**
+- Backend startup guard rejects default dev secret key in production mode
+- React Error Boundary at app root prevents blank-page failures
+- Dev-mode visual banner makes Vite dev usage immediately visible
+
+---
+
+## v0.5.0 — Auditability, Multi-Sample Ingestion, Lab Status
+
+**Release date:** 2026-02-04
+
+**Highlights:**
+- Lab Activity Log with required reasons for sensitive actions
+- Multi-sample ingestion: one raw file to many samples via RDMP-derived CSV template, with preview, confirm, and transactional creation
+- Lab status summary endpoint with needs-attention panel
+- Authority hints for role-appropriate action guidance
+
+---
+
 ## v0.4.0 — Usability, Onboarding, Remediation UX Polish
 
 **Release date:** 2026-02-04
@@ -33,7 +72,7 @@ This release focuses on improving user experience, clarity, and discoverability 
 
 **Release date:** 2026-02-02
 
-Completes the project lifecycle and governance UI. See [RELEASE_NOTES_v0.3.1.md](RELEASE_NOTES_v0.3.1.md) for full details.
+Completes the project lifecycle and governance UI.
 
 **Highlights:**
 - Create Project wizard with RDMP setup

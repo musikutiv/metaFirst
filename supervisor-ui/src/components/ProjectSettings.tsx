@@ -115,7 +115,7 @@ export function ProjectSettings({ project, onProjectUpdated, userRole }: Project
     <div style={styles.container}>
       <h3 style={styles.title}>
         Project Settings
-        {!canEdit && <PermissionHint requiredRole={['STEWARD', 'PI']} inline />}
+        <PermissionHint requiredRole={['STEWARD', 'PI']} userRole={userRole} inline />
       </h3>
 
       <div style={styles.section}>

@@ -636,7 +636,7 @@ class TestSupervisorMemberManagement:
         headers = get_auth_headers(client, "steward_user")
         response = client.patch(
             f"/api/supervisors/{supervisor.id}/members/{users['researcher_user'].id}",
-            json={"role": "STEWARD"},
+            json={"role": "STEWARD", "reason": "Promotion"},
             headers=headers,
         )
         assert response.status_code == 403
@@ -645,7 +645,7 @@ class TestSupervisorMemberManagement:
         headers = get_auth_headers(client, "pi_user")
         response = client.patch(
             f"/api/supervisors/{supervisor.id}/members/{users['researcher_user'].id}",
-            json={"role": "STEWARD"},
+            json={"role": "STEWARD", "reason": "Promotion for excellent work"},
             headers=headers,
         )
         assert response.status_code == 200

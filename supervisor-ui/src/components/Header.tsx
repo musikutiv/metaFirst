@@ -7,9 +7,10 @@ interface HeaderProps {
   onLogout: () => void;
   labName?: string | null;
   userRole?: LabRole | null;
+  supervisorId?: number | null;
 }
 
-export function Header({ user, onLogout, labName, userRole }: HeaderProps) {
+export function Header({ user, onLogout, labName, userRole, supervisorId }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isOverview = location.pathname === '/overview';
@@ -42,7 +43,7 @@ export function Header({ user, onLogout, labName, userRole }: HeaderProps) {
             Roles
           </button>
         </nav>
-        {labName && <LabContext labName={labName} userRole={userRole ?? null} />}
+        {labName && <LabContext labName={labName} userRole={userRole ?? null} supervisorId={supervisorId ?? null} />}
       </div>
       <div style={styles.right}>
         <span style={styles.user}>{user.display_name}</span>

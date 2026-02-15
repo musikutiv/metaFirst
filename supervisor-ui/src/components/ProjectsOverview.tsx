@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import type { Project, Supervisor } from '../types';
+import type { Project, Supervisor, NeedsAttentionItem } from '../types';
 import { StatusBadge, getRDMPStatus, type RDMPStatus } from './StatusBadge';
+import { NeedsAttentionPanel } from './NeedsAttentionPanel';
 
 interface ProjectWithDetails extends Project {
   supervisorName?: string;
@@ -21,6 +22,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [needsAttention, setNeedsAttention] = useState<NeedsAttentionItem[]>([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -35,6 +37,19 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       // Create supervisor lookup
       const supervisorMap = new Map<number, Supervisor>();
       supervisorsData.forEach((s) => supervisorMap.set(s.id, s));
+
+      // Fetch status summaries for all supervisors the user can access.
+      // Aggregate needs_attention from all labs (PI/Steward only).
+      const allNeedsAttention: NeedsAttentionItem[] = [];
+      for (const supervisor of supervisorsData) {
+        try {
+          const summary = await apiClient.getLabStatusSummary(supervisor.id);
+          allNeedsAttention.push(...summary.needs_attention);
+        } catch {
+          // 403 = researcher, or other error — skip silently
+        }
+      }
+      setNeedsAttention(allNeedsAttention);
 
       // For each project, get RDMP status and enrich with supervisor info
       const enrichedProjects: ProjectWithDetails[] = await Promise.all(
@@ -117,6 +132,15 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
+
+      {/* Needs Attention Panel (PI/Steward only — researchers won't have items) */}
+      {needsAttention.length > 0 && (
+        <NeedsAttentionPanel
+          items={needsAttention}
+          projectsById={new Map(projects.map((p) => [p.id, p]))}
+          onSelectProject={onSelectProject}
+        />
+      )}
 
       <div style={styles.searchBar}>
         <input

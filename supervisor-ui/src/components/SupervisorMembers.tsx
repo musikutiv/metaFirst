@@ -24,6 +24,7 @@ export function SupervisorMembers() {
   // Edit state
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editRole, setEditRole] = useState<string>('');
+  const [editReason, setEditReason] = useState<string>('');
 
   // Permission checks
   const canAddMember = hasPermission(currentUserRole, ['STEWARD', 'PI']);
@@ -76,11 +77,16 @@ export function SupervisorMembers() {
 
   const handleUpdateRole = async (userId: number) => {
     if (!supervisorId) return;
+    if (!editReason.trim()) {
+      setError('A reason is required for role changes');
+      return;
+    }
 
     setError(null);
     try {
-      await apiClient.updateSupervisorMember(parseInt(supervisorId), userId, editRole);
+      await apiClient.updateSupervisorMember(parseInt(supervisorId), userId, editRole, editReason.trim());
       setEditingUserId(null);
+      setEditReason('');
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update role');
@@ -103,11 +109,13 @@ export function SupervisorMembers() {
   const startEdit = (member: SupervisorMember) => {
     setEditingUserId(member.user_id);
     setEditRole(member.role);
+    setEditReason('');
   };
 
   const cancelEdit = () => {
     setEditingUserId(null);
     setEditRole('');
+    setEditReason('');
   };
 
   if (loading) {
@@ -145,6 +153,9 @@ export function SupervisorMembers() {
               </span>
             )}
           </p>
+          <p style={styles.roleNote}>
+            Roles are Lab-scoped. Your effective role is your highest stored Lab role.
+          </p>
         </div>
       </div>
 
@@ -154,7 +165,12 @@ export function SupervisorMembers() {
       <div style={styles.addForm}>
         <h3 style={styles.sectionTitle}>
           Add Member
-          {!canAddMember && <PermissionHint requiredRole={['STEWARD', 'PI']} inline />}
+          <PermissionHint
+            requiredRole={['STEWARD', 'PI']}
+            userRole={currentUserRole}
+            supervisorId={supervisorId ? parseInt(supervisorId) : undefined}
+            inline
+          />
         </h3>
         <form onSubmit={handleAddMember} style={styles.form}>
           <input
@@ -233,19 +249,32 @@ export function SupervisorMembers() {
                     </td>
                     <td style={styles.td}>
                       {editingUserId === member.user_id ? (
-                        <>
-                          <button
-                            style={styles.saveButton}
-                            onClick={() => handleUpdateRole(member.user_id)}
-                          >
-                            Save
-                          </button>
-                          <button style={styles.cancelButton} onClick={cancelEdit}>
-                            Cancel
-                          </button>
-                        </>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder="Reason for change (required)"
+                            value={editReason}
+                            onChange={(e) => setEditReason(e.target.value)}
+                            style={styles.reasonInput}
+                          />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              style={{
+                                ...styles.saveButton,
+                                ...(editReason.trim() ? {} : styles.disabledButton),
+                              }}
+                              onClick={() => handleUpdateRole(member.user_id)}
+                              disabled={!editReason.trim()}
+                            >
+                              Save
+                            </button>
+                            <button style={styles.cancelButton} onClick={cancelEdit}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             style={{
                               ...styles.editButton,
@@ -253,7 +282,6 @@ export function SupervisorMembers() {
                             }}
                             onClick={() => startEdit(member)}
                             disabled={!canEditRole}
-                            title={canEditRole ? undefined : 'Requires: PI'}
                           >
                             Edit
                           </button>
@@ -264,11 +292,18 @@ export function SupervisorMembers() {
                             }}
                             onClick={() => handleRemoveMember(member.user_id, member.username)}
                             disabled={!canRemoveMember}
-                            title={canRemoveMember ? undefined : 'Requires: PI'}
                           >
                             Remove
                           </button>
-                        </>
+                          {!canEditRole && (
+                            <PermissionHint
+                              requiredRole="PI"
+                              userRole={currentUserRole}
+                              supervisorId={supervisorId ? parseInt(supervisorId) : undefined}
+                              inline
+                            />
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -458,5 +493,18 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'not-allowed',
     color: '#9ca3af',
     borderColor: '#e5e7eb',
+  },
+roleNote: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '8px',
+    fontStyle: 'italic',
+  },
+  reasonInput: {
+    padding: '6px 10px',
+    fontSize: '13px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    width: '200px',
   },
 };

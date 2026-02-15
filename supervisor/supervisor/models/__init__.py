@@ -13,6 +13,7 @@ from supervisor.models.audit import AuditLog
 from supervisor.models.release import Release
 from supervisor.models.pending_ingest import PendingIngest, IngestStatus
 from supervisor.models.remediation import RemediationTask, IssueType, TaskStatus
+from supervisor.models.lab_activity import LabActivityLog, ActivityEventType, EntityType
 
 __all__ = [
     "Supervisor",
@@ -40,4 +41,7 @@ __all__ = [
     "RemediationTask",
     "IssueType",
     "TaskStatus",
+    "LabActivityLog",
+    "ActivityEventType",
+    "EntityType",
 ]

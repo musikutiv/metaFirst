@@ -193,6 +193,34 @@ export interface LabRoleInfo {
   role: LabRole | null;
 }
 
+// Lab Activity Log
+export interface ActivityLogEntry {
+  id: number;
+  lab_id: number;
+  created_at: string;
+  actor_user_id: number;
+  actor_display_name: string | null;
+  event_type: string;
+  entity_type: string;
+  entity_id: number;
+  summary_text: string;
+  reason_text: string | null;
+  before_json: Record<string, unknown> | null;
+  after_json: Record<string, unknown> | null;
+}
+
+export interface ActivityLogListResponse {
+  items: ActivityLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EventTypeOption {
+  value: string;
+  label: string;
+}
+
 // Remediation tasks (advisory, non-destructive)
 export type RemediationPriority = 'urgent' | 'recommended' | 'completed';
 
@@ -209,4 +237,35 @@ export interface RemediationTask {
   entityType: 'project' | 'sample' | 'rdmp' | 'ingest' | 'data';
   entityId?: number;
   entityName?: string;
+}
+
+// Lab status summary (from GET /supervisors/{id}/status-summary)
+export interface NeedsAttentionItem {
+  type: string;
+  severity: 'info' | 'warning' | 'high';
+  count: number;
+  entity_type: 'lab' | 'project';
+  entity_ids: number[];
+  message: string;
+}
+
+export interface LabStatusSummary {
+  projects: {
+    total_projects: number;
+    by_operational_state: {
+      operational: number;
+      non_operational: number;
+    };
+    by_rdmp_status: {
+      no_rdmp: number;
+      draft: number;
+      active: number;
+      superseded: number;
+    };
+  };
+  needs_attention: NeedsAttentionItem[];
+  remediation_summary: {
+    total_open: number;
+    by_severity: Record<string, number>;
+  };
 }

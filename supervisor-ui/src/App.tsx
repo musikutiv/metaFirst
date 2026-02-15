@@ -15,6 +15,7 @@ import { CreateProjectWizard } from './components/CreateProjectWizard';
 import { ProjectStatusCallout } from './components/ProjectStatusCallout';
 import { hasPermission } from './components/PermissionHint';
 import { SupervisorMembers } from './components/SupervisorMembers';
+import { LabActivity } from './components/LabActivity';
 import { ProjectsOverview } from './components/ProjectsOverview';
 import { RolesAndPermissions } from './components/RolesAndPermissions';
 import { RemediationTaskList } from './components/RemediationTaskList';
@@ -262,6 +263,20 @@ function App() {
     setRefreshCounter(c => c + 1);
   }, []);
 
+  // Derive remediation tasks from project data (must be called unconditionally)
+  const remediationTasks = useRemediationTasks({
+    projectId: selectedProjectId,
+    samples,
+    rawData,
+    activeRDMP,
+    pendingIngests,
+    storageRoots,
+    hasDraftRDMP,
+  });
+
+  // Count pending remediation tasks for badge
+  const pendingTaskCount = remediationTasks.filter(t => t.priority !== 'completed').length;
+
   // Show loading while checking auth
   if (authChecking) {
     return (
@@ -278,20 +293,6 @@ function App() {
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const fields = rdmp?.rdmp_json.fields || [];
-
-  // Derive remediation tasks from project data
-  const remediationTasks = useRemediationTasks({
-    projectId: selectedProjectId,
-    samples,
-    rawData,
-    activeRDMP,
-    pendingIngests,
-    storageRoots,
-    hasDraftRDMP,
-  });
-
-  // Count pending remediation tasks for badge
-  const pendingTaskCount = remediationTasks.filter(t => t.priority !== 'completed').length;
 
   // Render project-scoped content (metadata table or inbox)
   const renderProjectContent = (view: 'metadata' | 'inbox') => {
@@ -353,7 +354,7 @@ function App() {
 
   return (
     <div style={styles.app}>
-      <Header user={user} onLogout={handleLogout} labName={labName} userRole={userRole} />
+      <Header user={user} onLogout={handleLogout} labName={labName} userRole={userRole} supervisorId={selectedProject?.supervisor_id ?? null} />
 
       <main style={styles.main}>
         <Routes>
@@ -374,6 +375,12 @@ function App() {
           <Route
             path="/supervisors/:supervisorId/members"
             element={<SupervisorMembers />}
+          />
+
+          {/* Lab Activity Log */}
+          <Route
+            path="/supervisors/:supervisorId/activity"
+            element={<LabActivity />}
           />
 
           {/* Roles and Permissions documentation */}
@@ -432,6 +439,7 @@ function App() {
                         projectId={selectedProject.id}
                         rdmpStatus={activeRDMP ? 'ACTIVE' : 'NONE'}
                         canActivate={hasPermission(userRole, 'PI')}
+                        userRole={userRole}
                       />
                     )}
 
