@@ -15,7 +15,7 @@ describe('ProjectStatusCallout', () => {
     const callout = screen.getByTestId('project-status-callout');
     expect(callout).toHaveAttribute('data-rdmp-status', 'ACTIVE');
     expect(screen.getByText('Project Operational')).toBeInTheDocument();
-    expect(screen.getByText(/Data ingestion is enabled/)).toBeInTheDocument();
+    expect(screen.getByText(/You can add data/)).toBeInTheDocument();
   });
 
   it('shows draft pending message for DRAFT status', () => {
@@ -24,7 +24,7 @@ describe('ProjectStatusCallout', () => {
     );
     const callout = screen.getByTestId('project-status-callout');
     expect(callout).toHaveAttribute('data-rdmp-status', 'DRAFT');
-    expect(screen.getByText('RDMP Draft Pending')).toBeInTheDocument();
+    expect(screen.getByText('RDMP draft awaiting activation')).toBeInTheDocument();
     expect(screen.getByText(/Activate the RDMP draft/)).toBeInTheDocument();
     expect(screen.getByText('Activate RDMP')).toBeInTheDocument();
   });
@@ -53,7 +53,7 @@ describe('ProjectStatusCallout', () => {
     );
     const callout = screen.getByTestId('project-status-callout');
     expect(callout).toHaveAttribute('data-rdmp-status', 'NONE');
-    expect(screen.getByText('RDMP Required')).toBeInTheDocument();
+    expect(screen.getByText('RDMP needed')).toBeInTheDocument();
     expect(screen.getByText(/has no RDMP/)).toBeInTheDocument();
     expect(screen.getByText('Create RDMP')).toBeInTheDocument();
   });

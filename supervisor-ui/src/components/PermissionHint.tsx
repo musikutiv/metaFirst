@@ -48,7 +48,7 @@ export function PermissionHint({
 
   // Subtle hint when user has permission (or userRole not provided)
   if (permitted) {
-    const text = `Requires ${roleLabel}`;
+    const text = `Needs ${roleLabel} role`;
     if (inline) {
       return (
         <span
@@ -93,7 +93,7 @@ export function PermissionHint({
           marginLeft: '8px',
         }}
       >
-        (Requires {roleLabel} — you have {userRole}.{' '}
+        (Needs {roleLabel} role — you have {userRole}.{' '}
         {membersPath ? (
           <a
             href={membersPath}
@@ -124,7 +124,7 @@ export function PermissionHint({
         marginTop: '4px',
       }}
     >
-      Requires {roleLabel} — you have {userRole}.{' '}
+      Needs {roleLabel} role — you have {userRole}.{' '}
       {membersPath ? (
         <a
           href={membersPath}

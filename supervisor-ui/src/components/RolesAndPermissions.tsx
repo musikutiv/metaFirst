@@ -45,7 +45,7 @@ export function RolesAndPermissions() {
             <li>Modify project settings</li>
             <li>Create and edit RDMP drafts</li>
             <li>Add new members to the lab</li>
-            <li>Ingest data into projects</li>
+            <li>Add data to projects</li>
           </ul>
         </div>
 
@@ -77,7 +77,7 @@ export function RolesAndPermissions() {
           </li>
           <li>
             <strong>RDMP activation:</strong> Only a PI can activate an RDMP, which
-            makes the project operational for data ingestion. This ensures proper
+            makes the project operational for adding data. This ensures proper
             oversight of research data management plans.
           </li>
           <li>
@@ -92,9 +92,9 @@ export function RolesAndPermissions() {
       <div style={styles.lifecycleSection}>
         <h2 style={styles.sectionTitle}>Project State & RDMP Lifecycle</h2>
         <p style={styles.intro}>
-          Every project requires an active RDMP (Research Data Management Plan) to be
+          Every project needs an active RDMP (Research Data Management Plan) to be
           operational. The RDMP defines how data is managed, who can access it, and
-          what metadata is required.
+          what metadata is needed.
         </p>
 
         <h3 style={styles.subsectionTitle}>RDMP States</h3>
@@ -135,7 +135,7 @@ export function RolesAndPermissions() {
                 </span>
               </td>
               <td style={styles.td}>Project is operational</td>
-              <td style={styles.td}>Ingest data, manage samples, full operations</td>
+              <td style={styles.td}>Add data, manage samples, full operations</td>
               <td style={styles.td}>Continue working or create new draft for updates</td>
             </tr>
             <tr>
@@ -169,26 +169,26 @@ export function RolesAndPermissions() {
           </p>
         </div>
 
-        <h3 style={styles.subsectionTitle}>Blocked Operations</h3>
+        <h3 style={styles.subsectionTitle}>Needs an active RDMP</h3>
         <p style={styles.blockNote}>
-          Without an active RDMP, the following operations are blocked:
+          Without an active RDMP, the following operations are not available:
         </p>
         <ul style={styles.blockedList}>
-          <li>Data ingestion (adding new files to the project)</li>
+          <li>Adding new files to the project</li>
           <li>Sample creation</li>
           <li>Metadata modifications</li>
         </ul>
         <p style={styles.blockNote}>
-          The UI will show clear guidance on what action is needed to unblock operations.
+          The UI will show clear guidance on what action is needed to resume operations.
         </p>
       </div>
 
       {/* Remediation Tasks Section */}
       <div style={styles.remediationSection}>
-        <h2 style={styles.sectionTitle}>Remediation Tasks (Advisory)</h2>
+        <h2 style={styles.sectionTitle}>Suggested clean-up</h2>
         <p style={styles.intro}>
           The Tasks tab in each project shows suggested actions to improve your data
-          organization. These are advisory recommendations, not requirements.
+          organization. These are advisory recommendations, not obligations.
         </p>
 
         <div style={styles.advisoryCallout}>
@@ -196,7 +196,7 @@ export function RolesAndPermissions() {
           <div>
             <strong>Non-destructive and optional</strong>
             <p style={styles.advisoryText}>
-              Remediation tasks never delete or modify your data automatically. They
+              Clean-up items never delete or modify your data automatically. They
               provide guidance on what you could improve, with links to the relevant
               screens where you can take action manually.
             </p>
@@ -219,7 +219,7 @@ export function RolesAndPermissions() {
                   Urgent
                 </span>
               </td>
-              <td style={styles.td}>Blocks core project functionality</td>
+              <td style={styles.td}>Prevents core project functionality</td>
               <td style={styles.td}>No active RDMP, no storage root configured</td>
             </tr>
             <tr>
@@ -229,7 +229,7 @@ export function RolesAndPermissions() {
                 </span>
               </td>
               <td style={styles.td}>Improves data quality and organization</td>
-              <td style={styles.td}>Incomplete metadata, pending ingests, orphaned files</td>
+              <td style={styles.td}>Incomplete metadata, pending files, orphaned files</td>
             </tr>
             <tr>
               <td style={styles.td}>
@@ -246,7 +246,7 @@ export function RolesAndPermissions() {
         <h3 style={styles.subsectionTitle}>Typical Workflow</h3>
         <ol style={styles.workflowList}>
           <li>Open the <strong>Tasks</strong> tab in your project</li>
-          <li>Review urgent tasks first (these may block operations)</li>
+          <li>Review urgent tasks first (these may affect operations)</li>
           <li>Click <strong>Learn more</strong> on any task to understand its impact</li>
           <li>Click the action button to go to the screen where you can fix the issue</li>
           <li>Make changes as needed (all changes are manual and reversible)</li>

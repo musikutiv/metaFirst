@@ -57,9 +57,9 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>Ingest Inbox</h2>
+          <h2 style={styles.title}>Incoming Files</h2>
         </div>
-        <div style={styles.loading}>Loading pending ingests...</div>
+        <div style={styles.loading}>Loading incoming files...</div>
       </div>
     );
   }
@@ -68,7 +68,7 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>Ingest Inbox</h2>
+          <h2 style={styles.title}>Incoming Files</h2>
           <button onClick={loadPendingIngests} style={styles.refreshButton}>
             Refresh
           </button>
@@ -82,7 +82,7 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>
-          Ingest Inbox
+          Incoming Files
           {pendingIngests.length > 0 && (
             <span style={styles.badge}>{pendingIngests.length}</span>
           )}
@@ -98,9 +98,9 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
           <div style={styles.blockedContent}>
             <span style={styles.blockedIcon}>&#9888;</span>
             <div>
-              <p style={styles.blockedTitle}>Ingestion Blocked</p>
+              <p style={styles.blockedTitle}>Add data not available</p>
               <p style={styles.blockedText}>
-                This project has no active RDMP. Activate an RDMP to enable data ingestion.
+                Activate an RDMP to add data to this project.
               </p>
             </div>
           </div>
@@ -115,9 +115,9 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
 
       {pendingIngests.length === 0 ? (
         <div style={styles.empty}>
-          <p>No pending files to ingest.</p>
+          <p>No pending files.</p>
           <p style={styles.emptyHint}>
-            New files detected by the ingest helper will appear here.
+            New files detected by the file watcher will appear here.
           </p>
         </div>
       ) : (

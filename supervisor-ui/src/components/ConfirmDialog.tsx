@@ -95,7 +95,7 @@ export function ConfirmDialog({
 
         {requireReason && (
           <div style={styles.reasonContainer}>
-            <label style={styles.reasonLabel}>{reasonLabel} (required)</label>
+            <label style={styles.reasonLabel}>{reasonLabel} (needed)</label>
             <textarea
               style={styles.reasonInput}
               value={reason}

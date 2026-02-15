@@ -210,7 +210,7 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
-        <p>Loading ingest data...</p>
+        <p>Loading file data...</p>
       </div>
     );
   }
@@ -231,8 +231,8 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
   if (ingest.status !== 'PENDING') {
     return (
       <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>Ingest {ingest.status.toLowerCase()}</h2>
-        <p>This pending ingest has already been {ingest.status.toLowerCase()}.</p>
+        <h2 style={styles.errorTitle}>File {ingest.status.toLowerCase()}</h2>
+        <p>This file has already been {ingest.status.toLowerCase()}.</p>
         <button onClick={handleBack} style={styles.backButton}>
           Back to Inbox
         </button>
@@ -246,9 +246,9 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
       <div style={styles.pageContainer}>
         <div style={styles.blockedContainer}>
           <div style={styles.blockedIcon}>&#9888;</div>
-          <h2 style={styles.blockedTitle}>Ingestion Blocked</h2>
+          <h2 style={styles.blockedTitle}>Add data not available</h2>
           <p style={styles.blockedText}>
-            This project has no active RDMP. An RDMP must be activated before data can be ingested.
+            Activate an RDMP to add data to this project.
           </p>
           {ingest.project_name && (
             <p style={styles.blockedProject}>Project: {ingest.project_name}</p>
@@ -270,7 +270,7 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
     <div style={styles.pageContainer}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>Complete Ingest</h2>
+          <h2 style={styles.title}>Add Data</h2>
           <button onClick={handleBack} style={styles.closeButton}>
             &times;
           </button>
@@ -391,9 +391,9 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
           {/* RDMP Fields */}
           {requiredFields.length > 0 && (sampleOption === 'new' && newSampleIdentifier) && (
             <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Required Metadata Fields</h3>
+              <h3 style={styles.sectionTitle}>Core Metadata Fields</h3>
               <p style={styles.hint}>
-                Fill in required fields for the new sample. You can also complete these later.
+                Fill in core fields for the new sample. You can also complete these later.
               </p>
 
               {requiredFields.map((field) => (
@@ -420,14 +420,14 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
               style={styles.cancelButton}
               disabled={submitting}
             >
-              Cancel Ingest
+              Cancel
             </button>
             <button
               type="submit"
               style={styles.submitButton}
               disabled={submitting}
             >
-              {submitting ? 'Processing...' : 'Complete Ingest'}
+              {submitting ? 'Processing...' : 'Add Data'}
             </button>
           </div>
         </form>

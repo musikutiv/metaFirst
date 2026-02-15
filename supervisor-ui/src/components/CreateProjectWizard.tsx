@@ -252,7 +252,7 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
     <form onSubmit={handleCreateRDMP}>
       <h3 style={styles.stepTitle}>Create RDMP Draft</h3>
       <p style={styles.stepDescription}>
-        Every project needs an active RDMP before data can be ingested.
+        Every project needs an active RDMP before you can add data.
         Create a draft now - you can edit it later.
       </p>
 
@@ -306,7 +306,7 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
         <>
           <p style={styles.stepDescription}>
             Your project and RDMP draft have been created. Activate the RDMP to make
-            the project operational and allow data ingestion.
+            the project operational and start adding data.
           </p>
 
           <div style={styles.successBox}>
@@ -330,7 +330,7 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
               rows={3}
             />
             <p style={styles.hint}>
-              A reason is required for audit purposes.
+              Please provide a reason so the change is recorded.
             </p>
           </div>
 
@@ -361,10 +361,10 @@ export function CreateProjectWizard({ onClose, onProjectCreated, onRDMPActivated
       ) : (
         <>
           <div style={styles.warningBox}>
-            <p style={styles.warningTitle}>PI Approval Required</p>
+            <p style={styles.warningTitle}>Needs PI activation</p>
             <p style={styles.warningText}>
               The RDMP draft has been created, but only a PI can activate it.
-              Please ask a PI to review and activate the RDMP before data can be ingested.
+              Please ask a PI to review and activate the RDMP before you can add data.
             </p>
           </div>
 
