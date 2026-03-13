@@ -239,6 +239,19 @@ export interface RemediationTask {
   entityName?: string;
 }
 
+// File Annotations (one measurement file → many samples)
+export interface FileAnnotation {
+  id: number;
+  raw_data_item_id: number;
+  key: string;
+  sample_id: number | null;
+  index: unknown;
+  value_json: unknown;
+  value_text: string | null;
+  created_at: string | null;
+  created_by: number;
+}
+
 // Lab status summary (from GET /supervisors/{id}/status-summary)
 export interface NeedsAttentionItem {
   type: string;

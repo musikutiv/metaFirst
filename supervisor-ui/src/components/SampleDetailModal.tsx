@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import type { Sample, RawDataItem, RDMPField, StorageRoot } from '../types';
+import { useMemo, useState, useEffect } from 'react';
+import { apiClient } from '../api/client';
+import type { Sample, RawDataItem, RDMPField, StorageRoot, FileAnnotation } from '../types';
 
 interface SampleDetailModalProps {
   sample: Sample;
@@ -7,6 +8,7 @@ interface SampleDetailModalProps {
   fields: RDMPField[];
   storageRoots: StorageRoot[];
   onClose: () => void;
+  onSelectFile?: (item: RawDataItem) => void;
 }
 
 export function SampleDetailModal({
@@ -15,7 +17,10 @@ export function SampleDetailModal({
   fields,
   storageRoots,
   onClose,
+  onSelectFile,
 }: SampleDetailModalProps) {
+  const [measurements, setMeasurements] = useState<FileAnnotation[]>([]);
+  const [measurementsLoading, setMeasurementsLoading] = useState(false);
   // Filter raw data for this sample
   const sampleRawData = useMemo(
     () => rawData.filter((item) => item.sample_id === sample.id),
@@ -30,6 +35,24 @@ export function SampleDetailModal({
     }
     return names;
   }, [storageRoots]);
+
+  // Fetch annotations for this sample across its linked files
+  useEffect(() => {
+    if (sampleRawData.length === 0) return;
+    let active = true;
+    setMeasurementsLoading(true);
+    Promise.all(
+      sampleRawData.map((item) =>
+        apiClient.getFileAnnotations(item.id, { sampleId: sample.id }).catch(() => [] as FileAnnotation[])
+      )
+    ).then((results) => {
+      if (active) {
+        setMeasurements(results.flat());
+        setMeasurementsLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [sample.id, sampleRawData]);
 
   const formatFileSize = (bytes: number | null) => {
     if (bytes === null) return '-';
@@ -103,7 +126,14 @@ export function SampleDetailModal({
           ) : (
             <div style={styles.fileList}>
               {sampleRawData.map((item) => (
-                <div key={item.id} style={styles.fileItem}>
+                <div
+                  key={item.id}
+                  style={{
+                    ...styles.fileItem,
+                    ...(onSelectFile ? styles.fileItemClickable : {}),
+                  }}
+                  onClick={() => onSelectFile?.(item)}
+                >
                   <div style={styles.filePath}>{item.relative_path}</div>
                   <div style={styles.fileMeta}>
                     <span style={styles.storageRoot}>
@@ -116,6 +146,40 @@ export function SampleDetailModal({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Measurements (file annotations linking back to this sample) */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>
+            Measurements {measurementsLoading ? '…' : `(${measurements.length})`}
+          </h3>
+          {measurementsLoading ? (
+            <div style={styles.emptyFiles}>Loading…</div>
+          ) : measurements.length === 0 ? (
+            <div style={styles.emptyFiles}>No measurements recorded for this sample.</div>
+          ) : (
+            <div style={styles.fileList}>
+              {measurements.map((ann) => {
+                const file = sampleRawData.find((r) => r.id === ann.raw_data_item_id);
+                return (
+                  <div key={ann.id} style={styles.measurementRow}>
+                    <code style={styles.measurementKey}>{ann.key}</code>
+                    <span style={styles.measurementValue}>
+                      {ann.value_text ?? JSON.stringify(ann.value_json)}
+                    </span>
+                    {ann.index !== null && ann.index !== undefined && (
+                      <span style={styles.measurementIndex}>
+                        {JSON.stringify(ann.index)}
+                      </span>
+                    )}
+                    {file && (
+                      <span style={styles.measurementFile}>{file.relative_path}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -272,6 +336,47 @@ const styles: Record<string, React.CSSProperties> = {
   separator: {
     margin: '0 6px',
     color: '#d1d5db',
+  },
+  fileItemClickable: {
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  },
+  measurementRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '6px 10px',
+    background: '#f9fafb',
+    borderRadius: '4px',
+    border: '1px solid #e5e7eb',
+    flexWrap: 'wrap' as const,
+  },
+  measurementKey: {
+    fontFamily: 'monospace',
+    background: '#e5e7eb',
+    padding: '1px 5px',
+    borderRadius: '3px',
+    fontSize: '12px',
+    whiteSpace: 'nowrap' as const,
+  },
+  measurementValue: {
+    fontSize: '13px',
+    color: '#374151',
+  },
+  measurementIndex: {
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    color: '#6b7280',
+  },
+  measurementFile: {
+    fontSize: '11px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginLeft: 'auto',
+    maxWidth: '200px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   },
   footer: {
     display: 'flex',
