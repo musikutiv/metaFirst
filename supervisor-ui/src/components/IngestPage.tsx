@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP, RDMPVersion } from '../types';
+import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP, RDMPVersion, FileAnnotationCreate, RDMPRunField } from '../types';
 
 interface IngestPageProps {
   onProjectLoaded?: (projectId: number) => void;
-  onIngestComplete?: () => void;
+  onIngestComplete?: (rawDataItemId?: number) => void;
 }
 
 export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProps) {
@@ -20,11 +20,16 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
   const [samples, setSamples] = useState<Sample[]>([]);
   const [storageRoots, setStorageRoots] = useState<StorageRoot[]>([]);
 
-  // Form state
+  // Form state (single-sample path)
   const [sampleOption, setSampleOption] = useState<'existing' | 'new'>('new');
   const [selectedSampleId, setSelectedSampleId] = useState<number | null>(null);
   const [newSampleIdentifier, setNewSampleIdentifier] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
+  // Form state (multi-sample path)
+  const [runFieldValues, setRunFieldValues] = useState<Record<string, string>>({});
+  const [measuredRows, setMeasuredRows] = useState<Array<{ sampleId: number | null; index: Record<string, string> }>>([
+    { sampleId: null, index: {} },
+  ]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -84,6 +89,13 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
   const fields = rdmp?.rdmp_json.fields || [];
   const storageRoot = storageRoots.find(r => r.id === ingest?.storage_root_id);
 
+  // Derive multi-sample config from the active RDMP
+  const ingestConfig = activeRDMP?.content?.ingest as { measured_samples_mode?: string; multi?: { annotation_key?: string; index_fields?: string[]; run_fields?: RDMPRunField[] } } | undefined;
+  const isMultiMode = ingestConfig?.measured_samples_mode === 'multi';
+  const multiConfig = ingestConfig?.multi;
+  const indexFields = multiConfig?.index_fields ?? [];
+  const runFields = multiConfig?.run_fields ?? [];
+
   const requiredFields = useMemo(
     () => fields.filter(f => f.required),
     [fields]
@@ -109,25 +121,66 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
     setSubmitting(true);
 
     try {
-      let finalizeData: { sample_id?: number; sample_identifier?: string; field_values?: Record<string, unknown> } = {};
+      if (isMultiMode) {
+        // Validate multi-sample form
+        if (measuredRows.length === 0) {
+          setSubmitError('Add at least one measured sample row.');
+          setSubmitting(false);
+          return;
+        }
+        for (let i = 0; i < measuredRows.length; i++) {
+          const row = measuredRows[i];
+          if (!row.sampleId) {
+            setSubmitError(`Row ${i + 1}: select a sample.`);
+            setSubmitting(false);
+            return;
+          }
+          for (const f of indexFields) {
+            if (!row.index[f]?.trim()) {
+              setSubmitError(`Row ${i + 1}: "${f}" is required.`);
+              setSubmitting(false);
+              return;
+            }
+          }
+        }
 
-      if (sampleOption === 'existing' && selectedSampleId) {
-        finalizeData.sample_id = selectedSampleId;
-      } else if (sampleOption === 'new' && newSampleIdentifier.trim()) {
-        finalizeData.sample_identifier = newSampleIdentifier.trim();
-      }
+        const runAnnotations: FileAnnotationCreate[] = Object.entries(runFieldValues)
+          .filter(([, v]) => v.trim() !== '')
+          .map(([key, value]) => ({ key, sample_id: null, value_text: value }));
 
-      const filledFields = Object.entries(fieldValues).filter(([, v]) => v !== '' && v !== null);
-      if (filledFields.length > 0) {
-        finalizeData.field_values = Object.fromEntries(filledFields);
-      }
+        const measuredSamples: FileAnnotationCreate[] = measuredRows.map(row => ({
+          key: multiConfig?.annotation_key ?? 'observation',
+          sample_id: row.sampleId,
+          index: row.index,
+          // No value sent; server applies sentinel
+        }));
 
-      await apiClient.finalizePendingIngest(ingest.id, finalizeData);
-      // Trigger project data reload before navigating
-      if (onIngestComplete) {
-        onIngestComplete();
+        const result = await apiClient.finalizePendingIngest(ingest.id, {
+          run_annotations: runAnnotations.length > 0 ? runAnnotations : undefined,
+          measured_samples: measuredSamples,
+        });
+
+        if (onIngestComplete) onIngestComplete(result.id);
+        navigate('/');
+      } else {
+        // Single-sample path (unchanged)
+        let finalizeData: { sample_id?: number; sample_identifier?: string; field_values?: Record<string, unknown> } = {};
+
+        if (sampleOption === 'existing' && selectedSampleId) {
+          finalizeData.sample_id = selectedSampleId;
+        } else if (sampleOption === 'new' && newSampleIdentifier.trim()) {
+          finalizeData.sample_identifier = newSampleIdentifier.trim();
+        }
+
+        const filledFields = Object.entries(fieldValues).filter(([, v]) => v !== '' && v !== null);
+        if (filledFields.length > 0) {
+          finalizeData.field_values = Object.fromEntries(filledFields);
+        }
+
+        await apiClient.finalizePendingIngest(ingest.id, finalizeData);
+        if (onIngestComplete) onIngestComplete();
+        navigate('/');
       }
-      navigate('/');
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to finalize ingest');
     } finally {
@@ -153,6 +206,59 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
 
   const handleBack = () => {
     navigate('/inbox');
+  };
+
+  const handleRunFieldChange = (key: string, value: string) => {
+    setRunFieldValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleMeasuredRowSample = (rowIdx: number, sampleId: number | null) => {
+    setMeasuredRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, sampleId } : r));
+  };
+
+  const handleMeasuredRowIndex = (rowIdx: number, field: string, value: string) => {
+    setMeasuredRows(prev => prev.map((r, i) =>
+      i === rowIdx ? { ...r, index: { ...r.index, [field]: value } } : r
+    ));
+  };
+
+  const addMeasuredRow = () => {
+    setMeasuredRows(prev => [...prev, { sampleId: null, index: {} }]);
+  };
+
+  const removeMeasuredRow = (rowIdx: number) => {
+    setMeasuredRows(prev => prev.filter((_, i) => i !== rowIdx));
+  };
+
+  const renderRunFieldInput = (field: RDMPRunField) => {
+    const value = runFieldValues[field.key] ?? '';
+    if (field.type === 'date') {
+      return (
+        <input
+          type="date"
+          style={styles.input}
+          value={value}
+          onChange={(e) => handleRunFieldChange(field.key, e.target.value)}
+        />
+      );
+    }
+    if (field.type === 'text') {
+      return (
+        <textarea
+          style={{ ...styles.input, height: '64px', resize: 'vertical' }}
+          value={value}
+          onChange={(e) => handleRunFieldChange(field.key, e.target.value)}
+        />
+      );
+    }
+    return (
+      <input
+        type="text"
+        style={styles.input}
+        value={value}
+        onChange={(e) => handleRunFieldChange(field.key, e.target.value)}
+      />
+    );
   };
 
   const renderFieldInput = (field: RDMPField) => {
@@ -337,78 +443,159 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Sample Selection */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Link to Sample</h3>
-
-            <div style={styles.radioGroup}>
-              <label style={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="sampleOption"
-                  checked={sampleOption === 'existing'}
-                  onChange={() => setSampleOption('existing')}
-                />
-                <span>Link to existing sample</span>
-              </label>
-              <label style={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="sampleOption"
-                  checked={sampleOption === 'new'}
-                  onChange={() => setSampleOption('new')}
-                />
-                <span>Create new sample</span>
-              </label>
-            </div>
-
-            {sampleOption === 'existing' && (
-              <select
-                style={styles.input}
-                value={selectedSampleId || ''}
-                onChange={(e) => setSelectedSampleId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">-- Select a sample (optional) --</option>
-                {samples.map((sample) => (
-                  <option key={sample.id} value={sample.id}>
-                    {sample.sample_identifier}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {sampleOption === 'new' && (
-              <input
-                type="text"
-                style={styles.input}
-                placeholder="Sample identifier (optional)"
-                value={newSampleIdentifier}
-                onChange={(e) => setNewSampleIdentifier(e.target.value)}
-              />
-            )}
-          </div>
-
-          {/* RDMP Fields */}
-          {requiredFields.length > 0 && (sampleOption === 'new' && newSampleIdentifier) && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Core Metadata Fields</h3>
-              <p style={styles.hint}>
-                Fill in core fields for the new sample. You can also complete these later.
-              </p>
-
-              {requiredFields.map((field) => (
-                <div key={field.key} style={styles.fieldGroup}>
-                  <label style={styles.fieldLabel}>
-                    {field.key}
-                    {field.required && <span style={styles.required}>*</span>}
-                  </label>
-                  {field.description && (
-                    <div style={styles.fieldDescription}>{field.description}</div>
-                  )}
-                  {renderFieldInput(field)}
+          {isMultiMode ? (
+            <>
+              {/* Run details */}
+              {runFields.length > 0 && (
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>Run details</h3>
+                  {runFields.map((field) => (
+                    <div key={field.key} style={styles.fieldGroup}>
+                      <label style={styles.fieldLabel}>{field.label}</label>
+                      {renderRunFieldInput(field)}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+
+              {/* Measured samples grid */}
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>Measured samples</h3>
+                <p style={styles.hint}>Add a row for each sample measured in this run.</p>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={styles.grid}>
+                    <thead>
+                      <tr>
+                        <th style={styles.gridTh}>Sample</th>
+                        {indexFields.map(f => (
+                          <th key={f} style={styles.gridTh}>{f}</th>
+                        ))}
+                        <th style={styles.gridTh}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {measuredRows.map((row, idx) => (
+                        <tr key={idx}>
+                          <td style={styles.gridTd}>
+                            <select
+                              style={styles.gridInput}
+                              value={row.sampleId ?? ''}
+                              onChange={(e) => handleMeasuredRowSample(idx, e.target.value ? Number(e.target.value) : null)}
+                            >
+                              <option value="">-- select --</option>
+                              {samples.map(s => (
+                                <option key={s.id} value={s.id}>{s.sample_identifier}</option>
+                              ))}
+                            </select>
+                          </td>
+                          {indexFields.map(f => (
+                            <td key={f} style={styles.gridTd}>
+                              <input
+                                type="text"
+                                style={styles.gridInput}
+                                value={row.index[f] ?? ''}
+                                onChange={(e) => handleMeasuredRowIndex(idx, f, e.target.value)}
+                              />
+                            </td>
+                          ))}
+                          <td style={styles.gridTd}>
+                            <button
+                              type="button"
+                              onClick={() => removeMeasuredRow(idx)}
+                              style={styles.removeRowBtn}
+                              disabled={measuredRows.length === 1}
+                            >
+                              &times;
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button type="button" onClick={addMeasuredRow} style={styles.addRowBtn}>
+                  + Add row
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Sample Selection (single-sample path) */}
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>Link to Sample</h3>
+
+                <div style={styles.radioGroup}>
+                  <label style={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="sampleOption"
+                      checked={sampleOption === 'existing'}
+                      onChange={() => setSampleOption('existing')}
+                    />
+                    <span>Link to existing sample</span>
+                  </label>
+                  <label style={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="sampleOption"
+                      checked={sampleOption === 'new'}
+                      onChange={() => setSampleOption('new')}
+                    />
+                    <span>Create new sample</span>
+                  </label>
+                </div>
+
+                {sampleOption === 'existing' && (
+                  <select
+                    style={styles.input}
+                    value={selectedSampleId || ''}
+                    onChange={(e) => setSelectedSampleId(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">-- Select a sample (optional) --</option>
+                    {samples.map((sample) => (
+                      <option key={sample.id} value={sample.id}>
+                        {sample.sample_identifier}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {sampleOption === 'new' && (
+                  <input
+                    type="text"
+                    style={styles.input}
+                    placeholder="Sample identifier (optional)"
+                    value={newSampleIdentifier}
+                    onChange={(e) => setNewSampleIdentifier(e.target.value)}
+                  />
+                )}
+              </div>
+
+              {/* RDMP Fields */}
+              {requiredFields.length > 0 && (sampleOption === 'new' && newSampleIdentifier) && (
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>Core Metadata Fields</h3>
+                  <p style={styles.hint}>
+                    Fill in core fields for the new sample. You can also complete these later.
+                  </p>
+
+                  {requiredFields.map((field) => (
+                    <div key={field.key} style={styles.fieldGroup}>
+                      <label style={styles.fieldLabel}>
+                        {field.key}
+                        {field.required && <span style={styles.required}>*</span>}
+                      </label>
+                      {field.description && (
+                        <div style={styles.fieldDescription}>{field.description}</div>
+                      )}
+                      {renderFieldInput(field)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {submitError && <div style={styles.error}>{submitError}</div>}
@@ -427,7 +614,7 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
               style={styles.submitButton}
               disabled={submitting}
             >
-              {submitting ? 'Processing...' : 'Add Data'}
+              {submitting ? 'Processing...' : isMultiMode ? 'Save measurements' : 'Add Data'}
             </button>
           </div>
         </form>
@@ -701,5 +888,49 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     gap: '12px',
+  },
+  grid: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '13px',
+    marginBottom: '8px',
+  },
+  gridTh: {
+    padding: '6px 8px',
+    background: '#f3f4f6',
+    border: '1px solid #e5e7eb',
+    fontWeight: 600,
+    textAlign: 'left' as const,
+    color: '#374151',
+    whiteSpace: 'nowrap' as const,
+  },
+  gridTd: {
+    padding: '4px',
+    border: '1px solid #e5e7eb',
+  },
+  gridInput: {
+    width: '100%',
+    padding: '5px 8px',
+    fontSize: '13px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    boxSizing: 'border-box' as const,
+  },
+  addRowBtn: {
+    padding: '6px 12px',
+    fontSize: '13px',
+    background: '#f3f4f6',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    color: '#374151',
+  },
+  removeRowBtn: {
+    padding: '2px 8px',
+    fontSize: '16px',
+    background: 'none',
+    border: 'none',
+    color: '#9ca3af',
+    cursor: 'pointer',
   },
 };
