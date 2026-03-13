@@ -47,3 +47,8 @@ moving any of your actual data files.
 
 That's it. If someone in your group needs to set up metaFirst from
 scratch, there is a [step-by-step install guide](install).
+
+## Guides
+
+- [Researcher Guide](user-manual/researcher-guide) — full day-to-day walkthrough: projects, protocols, adding data, metadata visibility, worked example
+- [Glossary](user-manual/glossary) — quick reference for terms
