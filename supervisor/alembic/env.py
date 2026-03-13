@@ -1,5 +1,6 @@
 """Alembic environment configuration."""
 
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -13,6 +14,11 @@ from supervisor.models import *
 
 # this is the Alembic Config object
 config = context.config
+
+# Allow DATABASE_URL env var to override alembic.ini sqlalchemy.url
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url:
+    config.set_main_option("sqlalchemy.url", _database_url)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

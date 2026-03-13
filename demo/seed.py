@@ -25,6 +25,8 @@ from supervisor.models.supervisor_membership import SupervisorMembership, Superv
 from supervisor.models.rdmp import RDMPTemplate, RDMPTemplateVersion, RDMPVersion, RDMPStatus
 from supervisor.models.sample import Sample, SampleFieldValue
 from supervisor.models.storage import StorageRoot
+from supervisor.models.raw_data import RawDataItem
+from supervisor.models.annotations import FileAnnotation
 from supervisor.utils.security import hash_password
 
 
@@ -297,65 +299,65 @@ def seed_database():
         print("\n=== Creating Sample Data ===")
 
         # Project 1 samples (qPCR) - Bob creates samples
+        # Four samples: two controls, two treated; reuse if already present.
         print("\n  Project 1 samples (qPCR):")
 
-        # Sample 1: Complete sample
-        sample1 = Sample(
-            project_id=project1.id,
-            sample_identifier="QPCR-001",
-            created_by=users[1].id,  # Bob
-        )
-        db.add(sample1)
-        db.flush()
+        def _get_or_create_sample(project_id, identifier, created_by, fields_data):
+            """Return existing sample or create it with its field values."""
+            s = db.query(Sample).filter_by(
+                project_id=project_id, sample_identifier=identifier
+            ).first()
+            if s:
+                print(f"    ~ {identifier} (reused)")
+                return s
+            s = Sample(
+                project_id=project_id,
+                sample_identifier=identifier,
+                created_by=created_by,
+            )
+            db.add(s)
+            db.flush()
+            for field_key, value in fields_data:
+                db.add(SampleFieldValue(
+                    sample_id=s.id,
+                    field_key=field_key,
+                    value_json=json.dumps(value),
+                    value_text=str(value),
+                    updated_by=created_by,
+                ))
+            return s
 
-        # Add complete field values
-        fields1 = [
-            ("gene_name", "GAPDH"),
-            ("primer_batch", "BATCH-2024-01"),
+        common_fields = [
+            ("primer_batch", "BATCH-2024-03"),
             ("cell_line", "HeLa"),
-            ("replicate_number", 1),
-            ("experiment_date", "2024-01-15"),
-            ("notes", "Control sample"),
+            ("experiment_date", "2026-03-10"),
         ]
 
-        for field_key, value in fields1:
-            db.add(SampleFieldValue(
-                sample_id=sample1.id,
-                field_key=field_key,
-                value_json=json.dumps(value),
-                value_text=str(value),
-                updated_by=users[1].id,
-            ))
-
-        print(f"    ✓ {sample1.sample_identifier} (complete)")
-
-        # Sample 2: Incomplete sample (missing cell_line - required field)
-        sample2 = Sample(
-            project_id=project1.id,
-            sample_identifier="QPCR-002",
-            created_by=users[1].id,  # Bob
+        ctrl1 = _get_or_create_sample(
+            project1.id, "CTRL_1", users[1].id,
+            common_fields + [("replicate_number", 1), ("notes", "Control replicate 1")],
         )
-        db.add(sample2)
+        print(f"    ✓ CTRL_1")
+
+        ctrl2 = _get_or_create_sample(
+            project1.id, "CTRL_2", users[1].id,
+            common_fields + [("replicate_number", 2), ("notes", "Control replicate 2")],
+        )
+        print(f"    ✓ CTRL_2")
+
+        tr1 = _get_or_create_sample(
+            project1.id, "TR_1", users[1].id,
+            common_fields + [("replicate_number", 1), ("notes", "Treated replicate 1")],
+        )
+        print(f"    ✓ TR_1")
+
+        tr2 = _get_or_create_sample(
+            project1.id, "TR_2", users[1].id,
+            common_fields + [("replicate_number", 2), ("notes", "Treated replicate 2")],
+        )
+        print(f"    ✓ TR_2")
+
         db.flush()
-
-        # Add partial field values (missing cell_line)
-        fields2 = [
-            ("gene_name", "TP53"),
-            ("primer_batch", "BATCH-2024-01"),
-            ("replicate_number", 1),
-            ("experiment_date", "2024-01-16"),
-        ]
-
-        for field_key, value in fields2:
-            db.add(SampleFieldValue(
-                sample_id=sample2.id,
-                field_key=field_key,
-                value_json=json.dumps(value),
-                value_text=str(value),
-                updated_by=users[1].id,
-            ))
-
-        print(f"    ⚠ {sample2.sample_identifier} (INCOMPLETE - missing cell_line)")
 
         # Project 2 samples (RNA-seq) - David creates samples
         print("\n  Project 2 samples (RNA-seq):")
@@ -418,6 +420,81 @@ def seed_database():
 
         print(f"    ✓ {sample4.sample_identifier} (complete)")
 
+        print("\n=== Creating qPCR Measurement File + Annotations ===")
+
+        # Ensure placeholder file exists on disk
+        qpcr_rel_path = "demo/qpcr/qpcr_run_2026-03-10.csv"
+        placeholder = Path(__file__).parent / "qpcr" / "qpcr_run_2026-03-10.csv"
+        placeholder.parent.mkdir(parents=True, exist_ok=True)
+        if not placeholder.exists():
+            placeholder.touch()
+        print(f"  Placeholder file: {placeholder}")
+
+        # Reuse or create the RawDataItem (unique by storage_root + relative_path)
+        qpcr_item = db.query(RawDataItem).filter_by(
+            storage_root_id=storage_root1.id,
+            relative_path=qpcr_rel_path,
+        ).first()
+        if qpcr_item:
+            print(f"  RawDataItem reused (id={qpcr_item.id})")
+        else:
+            qpcr_item = RawDataItem(
+                project_id=project1.id,
+                storage_root_id=storage_root1.id,
+                relative_path=qpcr_rel_path,
+                storage_owner_user_id=users[1].id,  # Bob owns the file
+                created_by=users[1].id,
+                sample_id=None,  # multi-sample file; linkage via annotations
+            )
+            db.add(qpcr_item)
+            db.flush()
+            print(f"  RawDataItem created (id={qpcr_item.id})")
+
+        # Idempotent annotations: delete-then-recreate for this file's keys
+        deleted = db.query(FileAnnotation).filter(
+            FileAnnotation.raw_data_item_id == qpcr_item.id,
+            FileAnnotation.key.in_(["observation", "run_notes"]),
+        ).delete(synchronize_session=False)
+        db.flush()
+        if deleted:
+            print(f"  Removed {deleted} stale annotation(s)")
+
+        # 8 sample-level annotations (key="observation", no value — structure only)
+        plate_layout = [
+            (ctrl1, "A01", "GAPDH"),
+            (ctrl1, "A02", "TP53"),
+            (ctrl2, "B01", "GAPDH"),
+            (ctrl2, "B02", "TP53"),
+            (tr1,   "C01", "GAPDH"),
+            (tr1,   "C02", "TP53"),
+            (tr2,   "D01", "GAPDH"),
+            (tr2,   "D02", "TP53"),
+        ]
+
+        for sample, position, target in plate_layout:
+            db.add(FileAnnotation(
+                raw_data_item_id=qpcr_item.id,
+                sample_id=sample.id,
+                key="observation",
+                index_json={"position": position, "target": target},
+                value_json=None,
+                value_text=None,
+                created_by=users[1].id,
+            ))
+
+        # 1 file-level run note (sample_id = null)
+        db.add(FileAnnotation(
+            raw_data_item_id=qpcr_item.id,
+            sample_id=None,
+            key="run_notes",
+            index_json=None,
+            value_json=None,
+            value_text="Plate 1. SYBR Green. 40 cycles.",
+            created_by=users[1].id,
+        ))
+        db.flush()
+        print(f"  Created 8 sample-level + 1 file-level annotation(s)")
+
         db.commit()
 
         # Initialize operational database for the supervisor
@@ -448,10 +525,14 @@ def seed_database():
         print(f"  - Gene Expression Study 2024 (qPCR)")
         print(f"  - Transcriptomics Analysis (RNA-seq)")
         print(f"  - Cellular Imaging Core (Microscopy)")
-        print(f"\nSamples: 4 total")
-        print(f"  - 2 in qPCR project (1 incomplete)")
+        print(f"\nSamples: 6 total")
+        print(f"  - 4 in qPCR project: CTRL_1, CTRL_2, TR_1, TR_2 (all complete)")
         print(f"  - 1 in RNA-seq project")
         print(f"  - 1 in Microscopy project")
+        print(f"\nqPCR multi-sample file: {qpcr_rel_path}")
+        print(f"  - 8 sample-level annotations (key=observation, index=position+target)")
+        print(f"  - 1 file-level annotation (key=run_notes)")
+        print(f"  - Primary sample: none (annotations carry the sample structure)")
         print(f"\nMulti-project stewards:")
         print(f"  - Carol: Member of projects 1 and 2")
         print(f"  - Eve: Member of projects 2 and 3")

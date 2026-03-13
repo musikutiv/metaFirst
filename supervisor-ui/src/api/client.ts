@@ -1,4 +1,4 @@
-import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo, LabStatusSummary, ActivityLogListResponse, EventTypeOption } from '../types';
+import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo, LabStatusSummary, ActivityLogListResponse, EventTypeOption, FileAnnotation } from '../types';
 
 const API_BASE = '/api';
 
@@ -253,6 +253,64 @@ class ApiClient {
 
   async getLabActivityEventTypes(supervisorId: number): Promise<EventTypeOption[]> {
     return this.request<EventTypeOption[]>(`/supervisors/${supervisorId}/activity/event-types`);
+  }
+
+  // File Annotations
+  async getFileAnnotations(
+    rawDataItemId: number,
+    opts?: { key?: string; sampleId?: number }
+  ): Promise<FileAnnotation[]> {
+    const params = new URLSearchParams();
+    if (opts?.key) params.append('key', opts.key);
+    if (opts?.sampleId !== undefined) params.append('sample_id', String(opts.sampleId));
+    const query = params.toString();
+    return this.request<FileAnnotation[]>(
+      `/raw-data/${rawDataItemId}/annotations${query ? `?${query}` : ''}`
+    );
+  }
+
+  async createFileAnnotations(
+    rawDataItemId: number,
+    annotations: Array<{
+      key: string;
+      sample_id?: number | null;
+      index?: unknown;
+      value_json?: unknown;
+      value_text?: string | null;
+    }>
+  ): Promise<FileAnnotation[]> {
+    return this.request<FileAnnotation[]>(`/raw-data/${rawDataItemId}/annotations`, {
+      method: 'POST',
+      body: JSON.stringify({ annotations }),
+    });
+  }
+
+  async patchAnnotation(
+    annotationId: number,
+    patch: {
+      sample_id?: number | null;
+      index?: unknown;
+      value_json?: unknown;
+      value_text?: string | null;
+    }
+  ): Promise<FileAnnotation> {
+    return this.request<FileAnnotation>(`/annotations/${annotationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async deleteAnnotation(annotationId: number): Promise<void> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const response = await fetch(`${API_BASE}/annotations/${annotationId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error((error as { detail?: string }).detail || `HTTP ${response.status}`);
+    }
   }
 }
 

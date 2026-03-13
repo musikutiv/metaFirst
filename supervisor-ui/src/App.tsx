@@ -19,6 +19,7 @@ import { LabActivity } from './components/LabActivity';
 import { ProjectsOverview } from './components/ProjectsOverview';
 import { RolesAndPermissions } from './components/RolesAndPermissions';
 import { RemediationTaskList } from './components/RemediationTaskList';
+import { FileDetailModal } from './components/FileDetailModal';
 import { useRemediationTasks } from './hooks/useRemediationTasks';
 import type { User, Project, RDMP, Sample, RawDataItem, PendingIngest, StorageRoot, RDMPVersion, LabRole } from './types';
 
@@ -37,6 +38,7 @@ function App() {
   // Navigation state (for non-routed views within project context)
   const [selectedPendingIngest, setSelectedPendingIngest] = useState<PendingIngest | null>(null);
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
+  const [selectedRawDataItem, setSelectedRawDataItem] = useState<RawDataItem | null>(null);
 
   // Data state
   const [projects, setProjects] = useState<Project[]>([]);
@@ -188,6 +190,7 @@ function App() {
     setStorageRoots([]);
     setSelectedPendingIngest(null);
     setSelectedSample(null);
+    setSelectedRawDataItem(null);
     navigate('/');
   }, [navigate]);
 
@@ -203,6 +206,7 @@ function App() {
     setStorageRoots([]);
     setSelectedPendingIngest(null);
     setSelectedSample(null);
+    setSelectedRawDataItem(null);
   }, []);
 
   // Handle project creation from wizard
@@ -563,6 +567,18 @@ function App() {
           fields={fields}
           storageRoots={storageRoots}
           onClose={() => setSelectedSample(null)}
+          onSelectFile={(item) => setSelectedRawDataItem(item)}
+        />
+      )}
+
+      {/* File Detail Modal */}
+      {selectedRawDataItem && (
+        <FileDetailModal
+          item={selectedRawDataItem}
+          samples={samples}
+          storageRoots={storageRoots}
+          userRole={userRole}
+          onClose={() => setSelectedRawDataItem(null)}
         />
       )}
 
