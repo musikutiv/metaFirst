@@ -45,6 +45,7 @@ export interface RDMP {
     roles: RDMPRole[];
     fields: RDMPField[];
     file_patterns?: string[];
+    ingest?: RDMPIngestConfig;
   };
   created_at: string;
 }
@@ -120,10 +121,37 @@ export interface PendingIngest {
   detection_info?: SampleIdDetectionInfo | null;
 }
 
+export interface FileAnnotationCreate {
+  key: string;
+  sample_id?: number | null;
+  index?: Record<string, string> | null;
+  value_json?: unknown;
+  value_text?: string | null;
+}
+
 export interface PendingIngestFinalize {
   sample_id?: number;
   sample_identifier?: string;
   field_values?: Record<string, unknown>;
+  run_annotations?: FileAnnotationCreate[];
+  measured_samples?: FileAnnotationCreate[];
+}
+
+export interface RDMPRunField {
+  key: string;
+  label: string;
+  type: 'date' | 'string' | 'text';
+}
+
+export interface RDMPIngestMultiConfig {
+  annotation_key: string;
+  index_fields: string[];
+  run_fields: RDMPRunField[];
+}
+
+export interface RDMPIngestConfig {
+  measured_samples_mode: 'single' | 'multi';
+  multi?: RDMPIngestMultiConfig;
 }
 
 export interface RDMPVersion {

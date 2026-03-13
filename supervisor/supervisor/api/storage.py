@@ -13,6 +13,8 @@ from supervisor.models.storage import StorageRoot, StorageRootMapping
 from supervisor.models.raw_data import RawDataItem, PathChange
 from supervisor.models.sample import Sample, SampleFieldValue
 from supervisor.models.pending_ingest import PendingIngest, IngestStatus
+from supervisor.models.annotations import FileAnnotation
+from supervisor.models.rdmp import RDMPVersion, RDMPStatus
 from supervisor.schemas.storage import (
     StorageRoot as StorageRootSchema,
     StorageRootCreate,
@@ -828,6 +830,158 @@ def finalize_pending_ingest(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to finalize ingest",
         )
+
+    # ------------------------------------------------------------------ #
+    # Multi-sample finalize path                                          #
+    # ------------------------------------------------------------------ #
+    if finalize_data.measured_samples:
+        # Disallow mixing with single-sample fields
+        if finalize_data.sample_id or finalize_data.sample_identifier:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot mix single-sample fields (sample_id / sample_identifier) with measured_samples",
+            )
+
+        # Get active RDMP and verify multi-sample mode
+        active_rdmp = (
+            db.query(RDMPVersion)
+            .filter(
+                RDMPVersion.project_id == pending.project_id,
+                RDMPVersion.status == RDMPStatus.ACTIVE,
+            )
+            .first()
+        )
+        if not active_rdmp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active RDMP found for this project",
+            )
+
+        rdmp_json = active_rdmp.rdmp_json or {}
+        ingest_config = rdmp_json.get("ingest", {})
+        if ingest_config.get("measured_samples_mode") != "multi":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project RDMP ingest.measured_samples_mode must be 'multi' for multi-sample finalize",
+            )
+
+        multi_config = ingest_config.get("multi", {})
+        annotation_key = multi_config.get("annotation_key", "observation")
+        required_index_fields: list[str] = multi_config.get("index_fields", [])
+
+        # Validate each measured_samples row atomically (collect all errors)
+        errors: list[dict] = []
+        for i, ms in enumerate(finalize_data.measured_samples):
+            if ms.sample_id is None:
+                errors.append({"index": i, "field": "sample_id", "error": "sample_id is required"})
+                continue
+            sample = db.query(Sample).filter(Sample.id == ms.sample_id).first()
+            if not sample:
+                errors.append({"index": i, "field": "sample_id", "error": f"Sample {ms.sample_id} not found"})
+                continue
+            if sample.project_id != pending.project_id:
+                errors.append(
+                    {"index": i, "field": "sample_id", "error": f"Sample {ms.sample_id} does not belong to this project"}
+                )
+            for field in required_index_fields:
+                if not ms.index or field not in ms.index:
+                    errors.append({"index": i, "field": f"index.{field}", "error": f"required index field '{field}' is missing"})
+
+        if errors:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=errors)
+
+        # Create RawDataItem with sample_id=NULL (or reuse if path already exists)
+        existing_item = (
+            db.query(RawDataItem)
+            .filter(
+                RawDataItem.storage_root_id == pending.storage_root_id,
+                RawDataItem.relative_path == pending.relative_path,
+            )
+            .first()
+        )
+        if existing_item:
+            raw_data_item = existing_item
+        else:
+            raw_data_item = RawDataItem(
+                project_id=pending.project_id,
+                sample_id=None,
+                storage_root_id=pending.storage_root_id,
+                relative_path=pending.relative_path,
+                storage_owner_user_id=pending.created_by,
+                file_size_bytes=pending.file_size_bytes,
+                file_hash_sha256=pending.file_hash_sha256,
+                created_by=current_user.id,
+            )
+            db.add(raw_data_item)
+            db.flush()
+
+            log_create(
+                db=db,
+                project_id=pending.project_id,
+                actor_user_id=current_user.id,
+                target_type="RawDataItem",
+                target_id=raw_data_item.id,
+                after_state=serialize_raw_data_item(raw_data_item),
+            )
+
+        # Insert run-level annotations (sample_id forced NULL)
+        if finalize_data.run_annotations:
+            for ra in finalize_data.run_annotations:
+                db.add(FileAnnotation(
+                    raw_data_item_id=raw_data_item.id,
+                    sample_id=None,
+                    key=ra.key,
+                    index_json=None,
+                    value_json=ra.value_json,
+                    value_text=ra.value_text,
+                    created_by=current_user.id,
+                ))
+
+        # Insert per-sample measurement annotations (sentinel if no value)
+        for ms in finalize_data.measured_samples:
+            value_json = ms.value_json
+            value_text = ms.value_text
+            if value_json is None and value_text is None:
+                value_json = {"present": True}
+            db.add(FileAnnotation(
+                raw_data_item_id=raw_data_item.id,
+                sample_id=ms.sample_id,
+                key=annotation_key,
+                index_json=ms.index,
+                value_json=value_json,
+                value_text=value_text,
+                created_by=current_user.id,
+            ))
+
+        # Complete the pending ingest
+        pending.status = IngestStatus.COMPLETED.value
+        pending.completed_at = datetime.now(timezone.utc)
+        pending.raw_data_item_id = raw_data_item.id
+
+        db.commit()
+        db.refresh(raw_data_item)
+
+        storage_root_name = raw_data_item.storage_root.name if raw_data_item.storage_root else None
+        sample_identifier = raw_data_item.sample.sample_identifier if raw_data_item.sample else None
+
+        return RawDataItemWithDetails(
+            id=raw_data_item.id,
+            project_id=raw_data_item.project_id,
+            sample_id=raw_data_item.sample_id,
+            storage_root_id=raw_data_item.storage_root_id,
+            relative_path=raw_data_item.relative_path,
+            storage_owner_user_id=raw_data_item.storage_owner_user_id,
+            file_size_bytes=raw_data_item.file_size_bytes,
+            file_hash_sha256=raw_data_item.file_hash_sha256,
+            created_at=raw_data_item.created_at,
+            created_by=raw_data_item.created_by,
+            storage_root_name=storage_root_name,
+            sample_identifier=sample_identifier,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Single-sample finalize path (original logic unchanged)              #
+    # ------------------------------------------------------------------ #
 
     # Determine sample_id
     sample_id = finalize_data.sample_id

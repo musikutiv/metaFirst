@@ -79,5 +79,18 @@
   "ingestion_rules": {
     "file_patterns": ["*.csv", "*.xlsx"],
     "prompts": ["gene_name", "cell_line", "replicate_number"]
+  },
+  "ingest": {
+    "measured_samples_mode": "multi",
+    "multi": {
+      "annotation_key": "observation",
+      "index_fields": ["position", "target"],
+      "run_fields": [
+        {"key": "assay_date", "label": "Assay date", "type": "date"},
+        {"key": "instrument", "label": "Instrument", "type": "string"},
+        {"key": "chemistry", "label": "Chemistry", "type": "string"},
+        {"key": "run_notes", "label": "Run notes", "type": "text"}
+      ]
+    }
   }
 }

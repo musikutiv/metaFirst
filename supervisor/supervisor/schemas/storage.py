@@ -230,9 +230,27 @@ class PendingIngestWithDetails(PendingIngest):
     detection_info: SampleIdDetectionInfo | None = None
 
 
+class FileAnnotationCreate(BaseModel):
+    """A single annotation entry in a multi-sample finalize request.
+
+    Intentionally does NOT enforce that a value is present — the finalize
+    endpoint applies a sentinel value_json={"present": true} when both
+    value_json and value_text are absent (measured_samples path only).
+    """
+
+    key: str
+    sample_id: int | None = None
+    index: dict | None = None
+    value_json: Any = None
+    value_text: str | None = None
+
+
 class PendingIngestFinalize(BaseModel):
     """Finalize a pending ingest."""
 
     sample_id: int | None = None
     sample_identifier: str | None = None  # Create new sample if provided and sample_id is None
     field_values: dict[str, Any] | None = None  # Field key -> value mapping
+    # Multi-sample finalize fields (Option 2 / sentinel pattern)
+    run_annotations: list[FileAnnotationCreate] | None = None
+    measured_samples: list[FileAnnotationCreate] | None = None

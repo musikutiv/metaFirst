@@ -147,6 +147,10 @@ class ApiClient {
     return this.request<RawDataItem[]>(`/projects/${projectId}/raw-data${params}`);
   }
 
+  async getRawDataItem(rawDataItemId: number): Promise<RawDataItem> {
+    return this.request<RawDataItem>(`/raw-data/${rawDataItemId}`);
+  }
+
   // Storage Roots
   async getStorageRoots(projectId: number): Promise<StorageRoot[]> {
     return this.request<StorageRoot[]>(`/projects/${projectId}/storage-roots`);

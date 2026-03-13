@@ -237,10 +237,16 @@ function App() {
     setSelectedPendingIngest(ingest);
   }, []);
 
-  const handleIngestComplete = useCallback(() => {
+  const handleIngestComplete = useCallback((rawDataItemId?: number) => {
     setSelectedPendingIngest(null);
     // Trigger data reload to get updated samples and raw data
     setRefreshCounter(c => c + 1);
+    // For multi-sample finalize: open the FileDetailModal for the created item
+    if (rawDataItemId !== undefined) {
+      apiClient.getRawDataItem(rawDataItemId).then(item => {
+        setSelectedRawDataItem(item);
+      }).catch(() => {/* item will appear after data reload */});
+    }
   }, []);
 
   const handleIngestCancel = useCallback(() => {
@@ -316,6 +322,7 @@ function App() {
           fields={fields}
           samples={samples}
           storageRoots={storageRoots}
+          activeRdmpVersion={activeRDMP}
           onComplete={handleIngestComplete}
           onCancel={handleIngestCancel}
         />
