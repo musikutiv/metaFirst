@@ -49,7 +49,7 @@ export function AddMeasuredSamplesModal({
       ]);
       onCreated(created);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save annotation.');
+      setError(err instanceof Error ? err.message : 'Failed to save measurement.');
     } finally {
       setSaving(false);
     }

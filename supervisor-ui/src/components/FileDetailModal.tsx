@@ -91,7 +91,7 @@ export function FileDetailModal({
           </div>
 
           {loading ? (
-            <div style={styles.loading}>Loading annotations…</div>
+            <div style={styles.loading}>Loading…</div>
           ) : (
             <>
               {/* Overview: Measured Samples or Primary Sample */}
