@@ -21,12 +21,6 @@ export function SampleDetailModal({
 }: SampleDetailModalProps) {
   const [measurements, setMeasurements] = useState<FileAnnotation[]>([]);
   const [measurementsLoading, setMeasurementsLoading] = useState(false);
-  // Filter raw data for this sample
-  const sampleRawData = useMemo(
-    () => rawData.filter((item) => item.sample_id === sample.id),
-    [rawData, sample.id]
-  );
-
   // Build storage root name lookup
   const storageRootNames = useMemo(() => {
     const names: Record<number, string> = {};
@@ -36,13 +30,15 @@ export function SampleDetailModal({
     return names;
   }, [storageRoots]);
 
-  // Fetch annotations for this sample across its linked files
+  // Fetch annotations for this sample across ALL project raw data items.
+  // This covers both directly-linked files (sample_id FK) and measurement
+  // files that reference this sample only via FileAnnotation rows.
   useEffect(() => {
-    if (sampleRawData.length === 0) return;
+    if (rawData.length === 0) return;
     let active = true;
     setMeasurementsLoading(true);
     Promise.all(
-      sampleRawData.map((item) =>
+      rawData.map((item) =>
         apiClient.getFileAnnotations(item.id, { sampleId: sample.id }).catch(() => [] as FileAnnotation[])
       )
     ).then((results) => {
@@ -52,7 +48,7 @@ export function SampleDetailModal({
       }
     });
     return () => { active = false; };
-  }, [sample.id, sampleRawData]);
+  }, [sample.id, rawData]);
 
   const formatFileSize = (bytes: number | null) => {
     if (bytes === null) return '-';
@@ -115,40 +111,48 @@ export function SampleDetailModal({
           </div>
         </div>
 
-        {/* Raw Data Files */}
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>
-            Linked Files ({sampleRawData.length})
-          </h3>
-
-          {sampleRawData.length === 0 ? (
-            <div style={styles.emptyFiles}>No files linked to this sample.</div>
-          ) : (
-            <div style={styles.fileList}>
-              {sampleRawData.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    ...styles.fileItem,
-                    ...(onSelectFile ? styles.fileItemClickable : {}),
-                  }}
-                  onClick={() => onSelectFile?.(item)}
-                >
-                  <div style={styles.filePath}>{item.relative_path}</div>
-                  <div style={styles.fileMeta}>
-                    <span style={styles.storageRoot}>
-                      {storageRootNames[item.storage_root_id] || `Root ${item.storage_root_id}`}
-                    </span>
-                    <span style={styles.separator}>|</span>
-                    <span>{formatFileSize(item.file_size_bytes)}</span>
-                    <span style={styles.separator}>|</span>
-                    <span>{formatDate(item.created_at)}</span>
-                  </div>
+        {/* Raw Data Files — direct links + files linked via annotations */}
+        {(() => {
+          const annotationFileIds = new Set(measurements.map((m) => m.raw_data_item_id));
+          const allLinkedFiles = rawData.filter(
+            (item) => item.sample_id === sample.id || annotationFileIds.has(item.id)
+          );
+          const fileCount = measurementsLoading ? '…' : allLinkedFiles.length;
+          return (
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>Linked Files ({fileCount})</h3>
+              {measurementsLoading ? (
+                <div style={styles.emptyFiles}>Loading…</div>
+              ) : allLinkedFiles.length === 0 ? (
+                <div style={styles.emptyFiles}>No files linked to this sample.</div>
+              ) : (
+                <div style={styles.fileList}>
+                  {allLinkedFiles.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        ...styles.fileItem,
+                        ...(onSelectFile ? styles.fileItemClickable : {}),
+                      }}
+                      onClick={() => onSelectFile?.(item)}
+                    >
+                      <div style={styles.filePath}>{item.relative_path}</div>
+                      <div style={styles.fileMeta}>
+                        <span style={styles.storageRoot}>
+                          {storageRootNames[item.storage_root_id] || `Root ${item.storage_root_id}`}
+                        </span>
+                        <span style={styles.separator}>|</span>
+                        <span>{formatFileSize(item.file_size_bytes)}</span>
+                        <span style={styles.separator}>|</span>
+                        <span>{formatDate(item.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Measurements (file annotations linking back to this sample) */}
         <div style={styles.section}>
@@ -162,7 +166,7 @@ export function SampleDetailModal({
           ) : (
             <div style={styles.fileList}>
               {measurements.map((ann) => {
-                const file = sampleRawData.find((r) => r.id === ann.raw_data_item_id);
+                const file = rawData.find((r) => r.id === ann.raw_data_item_id);
                 return (
                   <div key={ann.id} style={styles.measurementRow}>
                     <code style={styles.measurementKey}>{ann.key}</code>

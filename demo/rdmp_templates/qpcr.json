@@ -35,7 +35,8 @@
       "key": "gene_name",
       "label": "Gene Name",
       "type": "string",
-      "required": true,
+      "required": false,
+      "description": "Primary target gene. Leave blank for multi-target plates — targets are captured per-well in file annotations.",
       "visibility": "public_index"
     },
     {
