@@ -31,6 +31,7 @@ The central backend service (FastAPI + SQLite).
 - `/api/rdmp` — RDMP templates and versioning
 - `/api/samples` — sample and field value CRUD
 - `/api/storage-roots`, `/api/raw-data` — storage root mappings and raw data references
+- `/api/raw-data/{id}/annotations`, `/api/annotations/{id}` — file annotation CRUD (multi-sample measurement files)
 - `/api/discovery` — federated metadata search (API-only)
 
 ### Supervisor UI
@@ -43,7 +44,9 @@ A React + Vite frontend for project management and metadata entry.
 - Project Settings: View/edit project configuration
 - RDMP Management: View versions, activate drafts (PI only)
 - Sample Table: RDMP-driven dynamic columns with completeness indicators
+- Sample Detail: Metadata fields, linked files (direct and annotation-linked), per-sample measurements
 - Pending Ingest: Browser-based metadata entry with sample ID detection
+- File Detail: Annotations panel with measured-sample table, per-well values, run notes, and Add Measurement form
 - Member Management: Add/remove supervisor members, change roles (PI only)
 
 ### User Machines and Ingest Helper
@@ -96,7 +99,23 @@ A metadata-only search index for cross-project discovery.
 3. Ingest helper calls `POST /api/projects/{id}/pending-ingests` with file metadata
 4. Supervisor creates a pending ingest record
 5. User completes metadata entry via browser (or API)
-6. Supervisor finalizes the ingest, creating a raw data item linked to a sample
+6. Supervisor finalizes the ingest, creating a raw data item linked to a sample (or with `sample_id = null` for multi-sample files)
+
+For measurement files that span many samples (e.g. a qPCR plate), the raw data item is created with `sample_id = null`. Sample linkage is then expressed via `FileAnnotation` rows — one per well/measurement — each carrying a `sample_id`, an optional `index` (e.g. well position), and the measured value. See [Multi-sample file pattern](#multi-sample-file-pattern) below.
+
+### Multi-sample File Pattern
+
+Some measurement files (e.g. qPCR plates, multi-well assays) contain data for many samples in a single file. metaFirst handles this via `FileAnnotation`:
+
+- `RawDataItem.sample_id = null` — the file does not belong to a single sample
+- `FileAnnotation` rows express per-sample (or per-well) linkage:
+  - `raw_data_item_id` — the file
+  - `sample_id` — which sample this measurement belongs to (null for file-level notes)
+  - `key` — measurement type (e.g. `"Ct_value"`, `"run_notes"`)
+  - `index` — optional position/target (e.g. `{"well": "A01", "target": "GAPDH"}`)
+  - `value_text` or `value_json` — the measured value
+
+The UI discovers annotation-linked files when displaying a sample's linked data, and the File Detail view provides a measured-sample table and a form for adding measurements.
 
 ### Local Metadata Management
 
@@ -167,7 +186,8 @@ All functionality is exposed via REST APIs:
 |--------|---------|
 | StorageRoot | Named storage location within a project |
 | StorageRootMapping | User-specific local path for a storage root |
-| RawDataItem | Reference to a file (storage root + relative path) |
+| RawDataItem | Reference to a file (storage root + relative path); `sample_id` is null for multi-sample files |
+| FileAnnotation | Key/value annotation on a raw data item, optionally linked to a sample (null = file-level) |
 | PathChange | Audit trail for path updates |
 
 ### Discovery Entities
@@ -277,6 +297,15 @@ PATCH  /api/rdmps/{id}                 # Update draft
 POST   /api/rdmps/{id}/activate        # Activate (PI only)
 ```
 
+### File Annotation API Endpoints
+
+```
+POST   /api/raw-data/{id}/annotations  # Create annotations (batch)
+GET    /api/raw-data/{id}/annotations  # List annotations (filter by key, sample_id)
+PATCH  /api/annotations/{id}           # Update an annotation
+DELETE /api/annotations/{id}           # Delete an annotation
+```
+
 ## Database Architecture (v0.2+)
 
 metaFirst uses a two-tier database architecture:
@@ -350,7 +379,8 @@ metaFirst/
 │
 ├── supervisor-ui/             # React frontend
 │   └── src/
-│       ├── components/        # UI components
+│       ├── components/        # UI components (SampleDetailModal, FileDetailModal,
+│       │                      #   MeasuredSamplesTable, AddMeasuredSamplesModal, …)
 │       └── api/               # API client
 │
 ├── ingest_helper/             # User-side file watcher
@@ -380,6 +410,12 @@ metaFirst/
 - Project Settings and RDMP Management UI
 - Supervisor member management UI
 - Projects Overview dashboard
+- Lab Activity Log with required reasons for sensitive actions
+- Multi-sample CSV import (one file to many samples via RDMP-derived template)
+- Lab status summary with needs-attention panel
+- File annotations for multi-sample measurement files (v0.7.0)
+- File Detail UI: measured-sample table, run notes, Add Measurement form (v0.7.0)
+- Sample Detail UI: annotation-discovered linked files and per-sample measurements (v0.7.0)
 - Federated discovery index (API-only)
 - Per-supervisor operational databases (ingest runs, heartbeats)
 
@@ -388,4 +424,3 @@ metaFirst/
 - Release management (immutable snapshots)
 - Release corrections (linked new releases)
 - Discovery web UI
-- Bulk sample operations

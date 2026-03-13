@@ -153,7 +153,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 
 ## Release Notes
 
-- [v0.5.0](docs/releases/v0.5.0-notes.md) — Auditability MVP, bulk sample import, governance clarity UX
+- [RELEASE.md](RELEASE.md) — full release history (v0.1.0 → v0.7.0)
 - [Upgrade Guide](docs/releases/UPGRADING.md) — migration instructions for each version
 
 ## Documentation

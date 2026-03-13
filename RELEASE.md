@@ -1,5 +1,58 @@
 # Release Notes
 
+## v0.7.0 — Multi-sample measurement file support
+
+**Release date:** 2026-03-13
+
+**Highlights:**
+- One raw data file can now link to many samples via file annotations (e.g. a qPCR plate with control and treatment wells)
+- `FileAnnotation` model: key, index (well/position/target), value, optional `sample_id` — file-level annotations use `sample_id = null`
+
+**Backend:**
+- New `file_annotations` table with Alembic migration
+- REST endpoints: `POST /raw-data/{id}/annotations`, `GET /raw-data/{id}/annotations`, `PATCH /annotations/{id}`, `DELETE /annotations/{id}`
+- `DATABASE_URL` environment variable now honoured by Alembic `env.py`
+
+**UI:**
+- `FileDetailModal` — annotations panel, measured-sample table, Add Measurement modal
+- `MeasuredSamplesTable` — sample, key, value, index columns
+- `AddMeasuredSamplesModal` — form to record a measurement against a sample within a file
+- `SampleDetailModal` — linked files section now discovers annotation-linked files; measurements section shows per-sample annotation rows; files are clickable to open File Detail
+
+**Demo:**
+- qPCR demo replaced: one plate file → CTRL_1, CTRL_2, TR_1, TR_2 samples with per-well Ct values and a file-level run note
+- RDMP `gene_name` field made optional (multi-target plates capture targets per well in annotations)
+
+**Fixes:**
+- Measurement UI uses plain language throughout ("measurement", "run notes") rather than internal "annotation" terminology
+
+---
+
+## v0.6.2 — Researcher User Manual
+
+**Release date:** 2026-03-13
+
+**Docs:**
+- Researcher-facing user manual added to GitHub Pages (lab overview, projects, RDMP, watch folder, Add Data workflow, worked example)
+- Glossary of metaFirst terms
+- Install links added to documentation index
+
+---
+
+## v0.6.1 — Documentation and Language Polish
+
+**Release date:** 2026-02-15
+
+**Docs:**
+- GitHub Pages site with researcher plain-language introduction
+- Step-by-step install guide
+- Install guide linked from researcher introduction
+
+**UI:**
+- Softened enforcement language across supervisor-ui (advisory tone throughout)
+
+---
+
 ## v0.6.0 — CI and Smoke Test
 
 **Release date:** 2026-02-09
