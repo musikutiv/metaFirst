@@ -1,6 +1,7 @@
 # metaFirst
 
 **Researcher?** See the [plain-language intro](https://bmc-CompBio.github.io/metaFirst/) ([source](docs/index.md)) — no technical background needed.
+**Day-to-day workflow?** Read the [Researcher Guide](https://bmc-CompBio.github.io/metaFirst/user-manual/researcher-guide) ([source](docs/user-manual/researcher-guide.md)).
 **Setting up?** Follow the [step-by-step install guide](https://bmc-CompBio.github.io/metaFirst/install) ([source](docs/install.md)).
 
 ---
