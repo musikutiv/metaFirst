@@ -14,6 +14,7 @@ from supervisor.models.release import Release
 from supervisor.models.pending_ingest import PendingIngest, IngestStatus
 from supervisor.models.remediation import RemediationTask, IssueType, TaskStatus
 from supervisor.models.lab_activity import LabActivityLog, ActivityEventType, EntityType
+from supervisor.models.annotations import FileAnnotation
 
 __all__ = [
     "Supervisor",
@@ -44,4 +45,5 @@ __all__ = [
     "LabActivityLog",
     "ActivityEventType",
     "EntityType",
+    "FileAnnotation",
 ]

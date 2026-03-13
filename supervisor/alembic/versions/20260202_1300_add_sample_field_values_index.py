@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '8a7c3d2e1f0b'
-down_revision = '20260202_1200_add_sample_id_rule_to_projects'
+down_revision = 'add_sample_id_rule'
 branch_labels = None
 depends_on = None
 
