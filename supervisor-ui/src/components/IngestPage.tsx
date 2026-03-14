@@ -122,6 +122,14 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
 
     try {
       if (isMultiMode) {
+        // Validate required run fields
+        for (const rf of runFields) {
+          if (rf.required && !runFieldValues[rf.key]?.trim()) {
+            setSubmitError(`"${rf.label}" is required.`);
+            setSubmitting(false);
+            return;
+          }
+        }
         // Validate multi-sample form
         if (measuredRows.length === 0) {
           setSubmitError('Add at least one measured sample row.');
@@ -451,7 +459,10 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
                   <h3 style={styles.sectionTitle}>Run details</h3>
                   {runFields.map((field) => (
                     <div key={field.key} style={styles.fieldGroup}>
-                      <label style={styles.fieldLabel}>{field.label}</label>
+                      <label style={styles.fieldLabel}>
+                        {field.label}
+                        {field.required && <span style={styles.required}>*</span>}
+                      </label>
                       {renderRunFieldInput(field)}
                     </div>
                   ))}

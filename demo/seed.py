@@ -327,33 +327,27 @@ def seed_database():
                 ))
             return s
 
-        common_fields = [
-            ("primer_batch", "BATCH-2024-03"),
-            ("cell_line", "HeLa"),
-            ("experiment_date", "2026-03-10"),
-        ]
-
         ctrl1 = _get_or_create_sample(
             project1.id, "CTRL_1", users[1].id,
-            common_fields + [("replicate_number", 1), ("notes", "Control replicate 1")],
+            [("genotype", "wildtype"), ("treatment", "vehicle")],
         )
         print(f"    ✓ CTRL_1")
 
         ctrl2 = _get_or_create_sample(
             project1.id, "CTRL_2", users[1].id,
-            common_fields + [("replicate_number", 2), ("notes", "Control replicate 2")],
+            [("genotype", "wildtype"), ("treatment", "vehicle")],
         )
         print(f"    ✓ CTRL_2")
 
         tr1 = _get_or_create_sample(
             project1.id, "TR_1", users[1].id,
-            common_fields + [("replicate_number", 1), ("notes", "Treated replicate 1")],
+            [("genotype", "wildtype"), ("treatment", "doxorubicin")],
         )
         print(f"    ✓ TR_1")
 
         tr2 = _get_or_create_sample(
             project1.id, "TR_2", users[1].id,
-            common_fields + [("replicate_number", 2), ("notes", "Treated replicate 2")],
+            [("genotype", "wildtype"), ("treatment", "doxorubicin")],
         )
         print(f"    ✓ TR_2")
 
@@ -453,7 +447,7 @@ def seed_database():
         # Idempotent annotations: delete-then-recreate for this file's keys
         deleted = db.query(FileAnnotation).filter(
             FileAnnotation.raw_data_item_id == qpcr_item.id,
-            FileAnnotation.key.in_(["observation", "run_notes"]),
+            FileAnnotation.key.in_(["observation", "primer_batch"]),
         ).delete(synchronize_session=False)
         db.flush()
         if deleted:
@@ -482,14 +476,14 @@ def seed_database():
                 created_by=users[1].id,
             ))
 
-        # 1 file-level run note (sample_id = null)
+        # 1 file-level run annotation: primer batch used for this run
         db.add(FileAnnotation(
             raw_data_item_id=qpcr_item.id,
             sample_id=None,
-            key="run_notes",
+            key="primer_batch",
             index_json=None,
             value_json=None,
-            value_text="Plate 1. SYBR Green. 40 cycles.",
+            value_text="BATCH-2024-03",
             created_by=users[1].id,
         ))
         db.flush()
@@ -526,12 +520,12 @@ def seed_database():
         print(f"  - Transcriptomics Analysis (RNA-seq)")
         print(f"  - Cellular Imaging Core (Microscopy)")
         print(f"\nSamples: 6 total")
-        print(f"  - 4 in qPCR project: CTRL_1, CTRL_2, TR_1, TR_2 (all complete)")
+        print(f"  - 4 in qPCR project: CTRL_1, CTRL_2 (genotype=wildtype, treatment=vehicle); TR_1, TR_2 (genotype=wildtype, treatment=doxorubicin)")
         print(f"  - 1 in RNA-seq project")
         print(f"  - 1 in Microscopy project")
         print(f"\nqPCR multi-sample file: {qpcr_rel_path}")
         print(f"  - 8 sample-level annotations (key=observation, index=position+target)")
-        print(f"  - 1 file-level annotation (key=run_notes)")
+        print(f"  - 1 file-level annotation (key=primer_batch)")
         print(f"  - Primary sample: none (annotations carry the sample structure)")
         print(f"\nMulti-project stewards:")
         print(f"  - Carol: Member of projects 1 and 2")
