@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import { apiClient } from '../api/client';
-import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMPVersion, FileAnnotationCreate, RDMPRunField } from '../types';
+import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP, FileAnnotationCreate, RDMPRunField } from '../types';
 
 interface IngestFormProps {
   ingest: PendingIngest;
   fields: RDMPField[];
   samples: Sample[];
   storageRoots: StorageRoot[];
-  activeRdmpVersion?: RDMPVersion | null;
+  rdmp?: RDMP | null;
   onComplete: (rawDataItemId?: number) => void;
   onCancel: () => void;
 }
@@ -17,7 +17,7 @@ export function IngestForm({
   fields,
   samples,
   storageRoots,
-  activeRdmpVersion,
+  rdmp,
   onComplete,
   onCancel,
 }: IngestFormProps) {
@@ -25,8 +25,8 @@ export function IngestForm({
   const initialIdentifier = ingest.detected_sample_id || ingest.inferred_sample_identifier || '';
   const hasDetectedId = !!ingest.detected_sample_id;
 
-  // Derive multi-sample config from the active RDMP
-  const ingestConfig = activeRdmpVersion?.content?.ingest as { measured_samples_mode?: string; multi?: { annotation_key?: string; index_fields?: string[]; run_fields?: RDMPRunField[] } } | undefined;
+  // Derive multi-sample config from the project RDMP (rdmp_json is the authoritative source)
+  const ingestConfig = rdmp?.rdmp_json?.ingest;
   const isMultiMode = ingestConfig?.measured_samples_mode === 'multi';
   const multiConfig = ingestConfig?.multi;
   const indexFields = multiConfig?.index_fields ?? [];
@@ -72,6 +72,14 @@ export function IngestForm({
 
     try {
       if (isMultiMode) {
+        // Validate required run fields
+        for (const rf of runFields) {
+          if (rf.required && !runFieldValues[rf.key]?.trim()) {
+            setError(`"${rf.label}" is required.`);
+            setSubmitting(false);
+            return;
+          }
+        }
         if (measuredRows.length === 0) {
           setError('Add at least one measured sample row.');
           setSubmitting(false);
@@ -325,7 +333,10 @@ export function IngestForm({
                 <h3 style={styles.sectionTitle}>Run details</h3>
                 {runFields.map((field) => (
                   <div key={field.key} style={styles.fieldGroup}>
-                    <label style={styles.fieldLabel}>{field.label}</label>
+                    <label style={styles.fieldLabel}>
+                      {field.label}
+                      {field.required && <span style={styles.required}>*</span>}
+                    </label>
                     {renderRunFieldInput(field)}
                   </div>
                 ))}

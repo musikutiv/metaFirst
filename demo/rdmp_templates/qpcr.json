@@ -32,53 +32,24 @@
   ],
   "fields": [
     {
-      "key": "gene_name",
-      "label": "Gene Name",
-      "type": "string",
-      "required": false,
-      "description": "Primary target gene. Leave blank for multi-target plates — targets are captured per-well in file annotations.",
-      "visibility": "public_index"
-    },
-    {
-      "key": "primer_batch",
-      "label": "Primer Batch",
+      "key": "genotype",
+      "label": "Genotype",
       "type": "string",
       "required": true,
+      "description": "Genetic background of the sample (e.g. wildtype, knockout).",
       "visibility": "collaborators"
     },
     {
-      "key": "cell_line",
-      "label": "Cell Line",
-      "type": "categorical",
-      "required": true,
-      "allowed_values": ["HeLa", "HEK293", "MCF7", "A549"],
-      "visibility": "public_index"
-    },
-    {
-      "key": "replicate_number",
-      "label": "Replicate Number",
-      "type": "number",
-      "required": true,
-      "visibility": "collaborators"
-    },
-    {
-      "key": "experiment_date",
-      "label": "Experiment Date",
-      "type": "date",
-      "required": true,
-      "visibility": "public_index"
-    },
-    {
-      "key": "notes",
-      "label": "Experimental Notes",
+      "key": "treatment",
+      "label": "Treatment",
       "type": "string",
-      "required": false,
-      "visibility": "private"
+      "required": true,
+      "description": "Experimental condition applied to the sample (e.g. vehicle, doxorubicin).",
+      "visibility": "collaborators"
     }
   ],
   "ingestion_rules": {
-    "file_patterns": ["*.csv", "*.xlsx"],
-    "prompts": ["gene_name", "cell_line", "replicate_number"]
+    "file_patterns": ["*.csv", "*.xlsx"]
   },
   "ingest": {
     "measured_samples_mode": "multi",
@@ -86,10 +57,7 @@
       "annotation_key": "observation",
       "index_fields": ["position", "target"],
       "run_fields": [
-        {"key": "assay_date", "label": "Assay date", "type": "date"},
-        {"key": "instrument", "label": "Instrument", "type": "string"},
-        {"key": "chemistry", "label": "Chemistry", "type": "string"},
-        {"key": "run_notes", "label": "Run notes", "type": "text"}
+        {"key": "primer_batch", "label": "Primer batch", "type": "string", "required": true}
       ]
     }
   }

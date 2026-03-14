@@ -141,6 +141,7 @@ export interface RDMPRunField {
   key: string;
   label: string;
   type: 'date' | 'string' | 'text';
+  required?: boolean;
 }
 
 export interface RDMPIngestMultiConfig {
