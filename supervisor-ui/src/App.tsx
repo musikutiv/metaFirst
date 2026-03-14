@@ -322,7 +322,7 @@ function App() {
           fields={fields}
           samples={samples}
           storageRoots={storageRoots}
-          activeRdmpVersion={activeRDMP}
+          rdmp={rdmp}
           onComplete={handleIngestComplete}
           onCancel={handleIngestCancel}
         />

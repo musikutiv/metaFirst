@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import { apiClient } from '../api/client';
-import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMPVersion, FileAnnotationCreate, RDMPRunField } from '../types';
+import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP, FileAnnotationCreate, RDMPRunField } from '../types';
 
 interface IngestFormProps {
   ingest: PendingIngest;
   fields: RDMPField[];
   samples: Sample[];
   storageRoots: StorageRoot[];
-  activeRdmpVersion?: RDMPVersion | null;
+  rdmp?: RDMP | null;
   onComplete: (rawDataItemId?: number) => void;
   onCancel: () => void;
 }
@@ -17,7 +17,7 @@ export function IngestForm({
   fields,
   samples,
   storageRoots,
-  activeRdmpVersion,
+  rdmp,
   onComplete,
   onCancel,
 }: IngestFormProps) {
@@ -25,8 +25,8 @@ export function IngestForm({
   const initialIdentifier = ingest.detected_sample_id || ingest.inferred_sample_identifier || '';
   const hasDetectedId = !!ingest.detected_sample_id;
 
-  // Derive multi-sample config from the active RDMP
-  const ingestConfig = activeRdmpVersion?.content?.ingest as { measured_samples_mode?: string; multi?: { annotation_key?: string; index_fields?: string[]; run_fields?: RDMPRunField[] } } | undefined;
+  // Derive multi-sample config from the project RDMP (rdmp_json is the authoritative source)
+  const ingestConfig = rdmp?.rdmp_json?.ingest;
   const isMultiMode = ingestConfig?.measured_samples_mode === 'multi';
   const multiConfig = ingestConfig?.multi;
   const indexFields = multiConfig?.index_fields ?? [];

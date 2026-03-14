@@ -89,8 +89,8 @@ export function IngestPage({ onProjectLoaded, onIngestComplete }: IngestPageProp
   const fields = rdmp?.rdmp_json.fields || [];
   const storageRoot = storageRoots.find(r => r.id === ingest?.storage_root_id);
 
-  // Derive multi-sample config from the active RDMP
-  const ingestConfig = activeRDMP?.content?.ingest as { measured_samples_mode?: string; multi?: { annotation_key?: string; index_fields?: string[]; run_fields?: RDMPRunField[] } } | undefined;
+  // Derive multi-sample config from the project RDMP (rdmp_json is the authoritative source)
+  const ingestConfig = rdmp?.rdmp_json?.ingest;
   const isMultiMode = ingestConfig?.measured_samples_mode === 'multi';
   const multiConfig = ingestConfig?.multi;
   const indexFields = multiConfig?.index_fields ?? [];
