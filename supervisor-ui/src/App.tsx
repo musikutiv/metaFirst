@@ -573,7 +573,12 @@ function App() {
           rawData={rawData}
           fields={fields}
           storageRoots={storageRoots}
+          userRole={userRole}
           onClose={() => setSelectedSample(null)}
+          onSampleUpdated={(updated) => {
+            setSelectedSample(updated);
+            setSamples(prev => prev.map(s => s.id === updated.id ? updated : s));
+          }}
           onSelectFile={(item) => setSelectedRawDataItem(item)}
         />
       )}
