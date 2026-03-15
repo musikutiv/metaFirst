@@ -1036,6 +1036,15 @@ def finalize_pending_ingest(
                     updated_by=current_user.id,
                 )
                 db.add(field_value)
+                log_update(
+                    db=db,
+                    project_id=pending.project_id,
+                    actor_user_id=current_user.id,
+                    target_type="Sample",
+                    target_id=sample_id,
+                    before_state={"field_key": field_key, "value": None},
+                    after_state={"field_key": field_key, "value": value},
+                )
 
     # Audit log
     log_create(

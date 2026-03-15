@@ -281,7 +281,10 @@ def set_field_value(
     )
 
     # Capture old value before mutation for audit log
-    old_value = json.loads(field_value.value_json) if field_value and field_value.value_json else None
+    if field_value and field_value.value_json:
+        old_value = json.loads(field_value.value_json)
+    else:
+        old_value = None
 
     if field_value:
         field_value.value_json = json.dumps(field_data.value)
@@ -303,8 +306,8 @@ def set_field_value(
         actor_user_id=current_user.id,
         target_type="Sample",
         target_id=sample_id,
-        before_state={"sample_id": sample_id, "field_key": field_key, "value": old_value},
-        after_state={"sample_id": sample_id, "field_key": field_key, "value": field_data.value},
+        before_state={"field_key": field_key, "value": old_value},
+        after_state={"field_key": field_key, "value": field_data.value},
     )
 
     db.commit()
