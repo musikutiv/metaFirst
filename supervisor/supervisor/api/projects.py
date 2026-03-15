@@ -98,6 +98,15 @@ def create_project(
         supervisor_id=project_data.supervisor_id
     )
     db.add(project)
+    db.flush()  # get project.id before commit
+
+    # Grant the creator PI membership so permission checks work immediately
+    db.add(Membership(
+        project_id=project.id,
+        user_id=current_user.id,
+        role_name="PI",
+        created_by=current_user.id,
+    ))
     db.commit()
     db.refresh(project)
 
