@@ -156,6 +156,13 @@ class ApiClient {
     return this.request<StorageRoot[]>(`/projects/${projectId}/storage-roots`);
   }
 
+  async createStorageRoot(projectId: number, data: { name: string; description?: string }): Promise<StorageRoot> {
+    return this.request<StorageRoot>(`/projects/${projectId}/storage-roots`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Pending Ingests
   async getPendingIngests(projectId: number, status?: string): Promise<PendingIngest[]> {
     const params = status ? `?status_filter=${status}` : '';
