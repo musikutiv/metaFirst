@@ -85,12 +85,22 @@ export interface AuthState {
   user: User | null;
 }
 
+export interface StorageRootMapping {
+  id: number;
+  user_id: number;
+  storage_root_id: number;
+  local_mount_path: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
 export interface StorageRoot {
   id: number;
   project_id: number;
   name: string;
   description: string | null;
   created_at: string;
+  userMapping?: StorageRootMapping | null;
 }
 
 export interface SampleIdDetectionInfo {

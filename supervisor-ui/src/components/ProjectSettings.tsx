@@ -31,11 +31,20 @@ export function ProjectSettings({ project, onProjectUpdated, userRole }: Project
   const [rootError, setRootError] = useState<string | null>(null);
   const [rootSuccess, setRootSuccess] = useState<string | null>(null);
 
+  // Mapping edit state
+  const [editingMappingId, setEditingMappingId] = useState<number | null>(null);
+  const [editingMappingPath, setEditingMappingPath] = useState('');
+  const [mappingSaving, setMappingSaving] = useState(false);
+  const [mappingError, setMappingError] = useState<string | null>(null);
+
   const loadStorageRoots = async () => {
     setStorageRootsLoading(true);
     try {
       const roots = await apiClient.getStorageRoots(project.id);
-      setStorageRoots(roots);
+      const mappings = await Promise.all(
+        roots.map(r => apiClient.getStorageRootMappings(r.id).then(ms => ms[0] ?? null).catch(() => null))
+      );
+      setStorageRoots(roots.map((r, i) => ({ ...r, userMapping: mappings[i] })));
     } catch {
       // non-fatal — list stays empty
     } finally {
@@ -153,6 +162,20 @@ export function ProjectSettings({ project, onProjectUpdated, userRole }: Project
     }
   };
 
+  const handleSaveMapping = async (storageRootId: number) => {
+    setMappingError(null);
+    setMappingSaving(true);
+    try {
+      await apiClient.setStorageRootMapping(storageRootId, editingMappingPath.trim());
+      setEditingMappingId(null);
+      await loadStorageRoots();
+    } catch (e) {
+      setMappingError(e instanceof Error ? e.message : 'Failed to save path');
+    } finally {
+      setMappingSaving(false);
+    }
+  };
+
   const hasChanges =
     (ruleType || '') !== (project.sample_id_rule_type || '') ||
     (regex || '') !== (project.sample_id_regex || '');
@@ -258,10 +281,58 @@ export function ProjectSettings({ project, onProjectUpdated, userRole }: Project
           <ul style={styles.rootList}>
             {storageRoots.map((root) => (
               <li key={root.id} style={styles.rootItem}>
-                <span style={styles.rootName}>{root.name}</span>
-                {root.description && (
-                  <span style={styles.rootDescription}>{root.description}</span>
-                )}
+                <div style={styles.rootItemMain}>
+                  <span style={styles.rootName}>{root.name}</span>
+                  {root.description && (
+                    <span style={styles.rootDescription}>{root.description}</span>
+                  )}
+                  {editingMappingId === root.id ? (
+                    <div style={styles.mappingEditRow}>
+                      <input
+                        type="text"
+                        style={styles.mappingInput}
+                        value={editingMappingPath}
+                        onChange={(e) => setEditingMappingPath(e.target.value)}
+                        placeholder="/path/to/local/mount"
+                        disabled={mappingSaving}
+                        autoFocus
+                      />
+                      <button
+                        style={styles.mappingSaveButton}
+                        onClick={() => handleSaveMapping(root.id)}
+                        disabled={mappingSaving || !editingMappingPath.trim()}
+                      >
+                        {mappingSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        style={styles.mappingCancelButton}
+                        onClick={() => { setEditingMappingId(null); setMappingError(null); }}
+                        disabled={mappingSaving}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={styles.mappingRow}>
+                      <span style={root.userMapping ? styles.mappingPath : styles.mappingMissing}>
+                        {root.userMapping ? root.userMapping.local_mount_path : '(no local path configured)'}
+                      </span>
+                      <button
+                        style={styles.setPathButton}
+                        onClick={() => {
+                          setEditingMappingId(root.id);
+                          setEditingMappingPath(root.userMapping?.local_mount_path ?? '');
+                          setMappingError(null);
+                        }}
+                      >
+                        Set local path
+                      </button>
+                    </div>
+                  )}
+                  {editingMappingId === root.id && mappingError && (
+                    <div style={styles.mappingErrorInline}>{mappingError}</div>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -270,13 +341,13 @@ export function ProjectSettings({ project, onProjectUpdated, userRole }: Project
         {canManageStorage && (
           <div style={styles.rootForm}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Name *</label>
+              <label style={styles.label}>Device name *</label>
               <input
                 type="text"
                 style={styles.input}
                 value={newRootName}
                 onChange={(e) => setNewRootName(e.target.value)}
-                placeholder="e.g., /data/imaging"
+                placeholder="e.g., NovaSeq output NAS"
                 disabled={rootSaving}
               />
             </div>
@@ -481,13 +552,15 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   rootItem: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '10px',
-    padding: '8px 12px',
+    padding: '10px 12px',
     background: '#f9fafb',
     borderRadius: '6px',
     border: '1px solid #e5e7eb',
+  },
+  rootItemMain: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
   },
   rootName: {
     fontSize: '13px',
@@ -496,8 +569,73 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   rootDescription: {
-    fontSize: '13px',
+    fontSize: '12px',
     color: '#6b7280',
+  },
+  mappingRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginTop: '2px',
+  },
+  mappingPath: {
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    color: '#374151',
+  },
+  mappingMissing: {
+    fontSize: '12px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  setPathButton: {
+    padding: '2px 8px',
+    fontSize: '12px',
+    background: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    color: '#374151',
+    cursor: 'pointer',
+  },
+  mappingEditRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginTop: '4px',
+  },
+  mappingInput: {
+    flex: 1,
+    padding: '4px 8px',
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    minWidth: 0,
+  },
+  mappingSaveButton: {
+    padding: '4px 10px',
+    fontSize: '12px',
+    fontWeight: 500,
+    background: '#2563eb',
+    border: 'none',
+    borderRadius: '4px',
+    color: '#fff',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  mappingCancelButton: {
+    padding: '4px 8px',
+    fontSize: '12px',
+    background: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    color: '#6b7280',
+    cursor: 'pointer',
+  },
+  mappingErrorInline: {
+    fontSize: '12px',
+    color: '#dc2626',
+    marginTop: '2px',
   },
   rootForm: {
     paddingTop: '12px',

@@ -1,4 +1,4 @@
-import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo, LabStatusSummary, ActivityLogListResponse, EventTypeOption, FileAnnotation } from '../types';
+import type { Project, RDMP, Sample, RawDataItem, User, StorageRoot, StorageRootMapping, PendingIngest, PendingIngestFinalize, RDMPVersion, ProjectUpdate, RDMPCreate, RDMPUpdate, Supervisor, ProjectCreate, SupervisorMember, SampleListResponse, LabRoleInfo, LabStatusSummary, ActivityLogListResponse, EventTypeOption, FileAnnotation } from '../types';
 
 const API_BASE = '/api';
 
@@ -160,6 +160,17 @@ class ApiClient {
     return this.request<StorageRoot>(`/projects/${projectId}/storage-roots`, {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async getStorageRootMappings(storageRootId: number): Promise<StorageRootMapping[]> {
+    return this.request<StorageRootMapping[]>(`/storage-roots/${storageRootId}/mappings`);
+  }
+
+  async setStorageRootMapping(storageRootId: number, localMountPath: string): Promise<StorageRootMapping> {
+    return this.request<StorageRootMapping>(`/storage-roots/${storageRootId}/mappings`, {
+      method: 'POST',
+      body: JSON.stringify({ local_mount_path: localMountPath }),
     });
   }
 
