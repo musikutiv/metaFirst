@@ -134,8 +134,10 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
                 {(() => {
                   const root = getStorageRoot(ingest.storage_root_id);
                   const fullPath = root ? getFullLocalPath(root, ingest.relative_path) : null;
+                  const fileName = ingest.relative_path.split('/').pop() ?? ingest.relative_path;
                   return (
                     <>
+                      <div style={styles.fileName}>{fileName}</div>
                       <div style={styles.deviceName}>
                         {root?.name ?? `Root ${ingest.storage_root_id}`}
                       </div>
@@ -251,16 +253,23 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minWidth: 0,
   },
+  fileName: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#111827',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   deviceName: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 600,
     color: '#2563eb',
-    marginBottom: '2px',
+    marginTop: '1px',
   },
   filePath: {
-    fontSize: '13px',
-    fontWeight: 500,
-    color: '#111827',
+    fontSize: '11px',
+    color: '#6b7280',
     fontFamily: 'monospace',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
