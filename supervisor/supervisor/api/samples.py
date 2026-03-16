@@ -21,6 +21,7 @@ from supervisor.schemas.sample import (
 from supervisor.api.deps import get_current_active_user, require_supervisor_role, require_project_access
 from supervisor.services.rdmp_service import get_current_rdmp, check_sample_completeness, validate_field_value
 from supervisor.services.permission_service import check_permission
+from supervisor.services.audit_service import log_update
 
 
 class VisibilityUpdate(BaseModel):
@@ -279,6 +280,12 @@ def set_field_value(
         .first()
     )
 
+    # Capture old value before mutation for audit log
+    if field_value and field_value.value_json:
+        old_value = json.loads(field_value.value_json)
+    else:
+        old_value = None
+
     if field_value:
         field_value.value_json = json.dumps(field_data.value)
         field_value.value_text = str(field_data.value)
@@ -292,6 +299,16 @@ def set_field_value(
             updated_by=current_user.id
         )
         db.add(field_value)
+
+    log_update(
+        db=db,
+        project_id=sample.project_id,
+        actor_user_id=current_user.id,
+        target_type="Sample",
+        target_id=sample_id,
+        before_state={"field_key": field_key, "value": old_value},
+        after_state={"field_key": field_key, "value": field_data.value},
+    )
 
     db.commit()
 

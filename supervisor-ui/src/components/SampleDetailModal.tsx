@@ -1,13 +1,16 @@
 import { useMemo, useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import type { Sample, RawDataItem, RDMPField, StorageRoot, FileAnnotation } from '../types';
+import type { Sample, RawDataItem, RDMPField, StorageRoot, FileAnnotation, LabRole } from '../types';
+import { hasPermission } from './PermissionHint';
 
 interface SampleDetailModalProps {
   sample: Sample;
   rawData: RawDataItem[];
   fields: RDMPField[];
   storageRoots: StorageRoot[];
+  userRole?: LabRole | null;
   onClose: () => void;
+  onSampleUpdated?: (sample: Sample) => void;
   onSelectFile?: (item: RawDataItem) => void;
 }
 
@@ -16,11 +19,29 @@ export function SampleDetailModal({
   rawData,
   fields,
   storageRoots,
+  userRole,
   onClose,
+  onSampleUpdated,
   onSelectFile,
 }: SampleDetailModalProps) {
+  const canEdit = hasPermission(userRole ?? null, 'RESEARCHER');
+
   const [measurements, setMeasurements] = useState<FileAnnotation[]>([]);
   const [measurementsLoading, setMeasurementsLoading] = useState(false);
+
+  // Per-field edit state
+  const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
+
+  // Reset drafts when the sample changes (parent refreshed after a save)
+  useEffect(() => {
+    setDrafts({});
+    setFieldErrors({});
+    setSaved({});
+  }, [sample.id, sample.fields]);
+
   // Build storage root name lookup
   const storageRootNames = useMemo(() => {
     const names: Record<number, string> = {};
@@ -31,8 +52,6 @@ export function SampleDetailModal({
   }, [storageRoots]);
 
   // Fetch annotations for this sample across ALL project raw data items.
-  // This covers both directly-linked files (sample_id FK) and measurement
-  // files that reference this sample only via FileAnnotation rows.
   useEffect(() => {
     if (rawData.length === 0) return;
     let active = true;
@@ -49,6 +68,106 @@ export function SampleDetailModal({
     });
     return () => { active = false; };
   }, [sample.id, rawData]);
+
+  const getDraft = (field: RDMPField): unknown => {
+    if (field.key in drafts) return drafts[field.key];
+    const current = sample.fields[field.key];
+    return current ?? '';
+  };
+
+  const setDraft = (key: string, value: unknown) => {
+    setDrafts(prev => ({ ...prev, [key]: value }));
+    setSaved(prev => ({ ...prev, [key]: false }));
+    setFieldErrors(prev => ({ ...prev, [key]: null }));
+  };
+
+  const handleSave = async (field: RDMPField) => {
+    const value = getDraft(field);
+    // Convert empty string to null for optional fields
+    const sendValue = value === '' ? null : value;
+
+    setSaving(prev => ({ ...prev, [field.key]: true }));
+    setFieldErrors(prev => ({ ...prev, [field.key]: null }));
+    setSaved(prev => ({ ...prev, [field.key]: false }));
+
+    try {
+      await apiClient.setSampleField(sample.id, field.key, sendValue);
+      const updated = await apiClient.getSample(sample.id);
+      onSampleUpdated?.(updated);
+      setSaved(prev => ({ ...prev, [field.key]: true }));
+      // Clear the draft so subsequent render uses the fresh value from props
+      setDrafts(prev => {
+        const next = { ...prev };
+        delete next[field.key];
+        return next;
+      });
+    } catch (e) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [field.key]: e instanceof Error ? e.message : 'Save failed',
+      }));
+    } finally {
+      setSaving(prev => ({ ...prev, [field.key]: false }));
+    }
+  };
+
+  const isDirty = (field: RDMPField): boolean => {
+    if (!(field.key in drafts)) return false;
+    const current = sample.fields[field.key] ?? '';
+    return drafts[field.key] !== current;
+  };
+
+  const renderFieldInput = (field: RDMPField) => {
+    const value = getDraft(field);
+    const isSaving = saving[field.key] ?? false;
+
+    if (field.allowed_values && field.allowed_values.length > 0) {
+      return (
+        <select
+          style={styles.editInput}
+          value={value as string}
+          disabled={isSaving}
+          onChange={(e) => setDraft(field.key, e.target.value)}
+        >
+          <option value="">-- Select --</option>
+          {field.allowed_values.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+      );
+    }
+    if (field.type === 'number') {
+      return (
+        <input
+          type="number"
+          style={styles.editInput}
+          value={value as string}
+          disabled={isSaving}
+          onChange={(e) => setDraft(field.key, e.target.value === '' ? '' : Number(e.target.value))}
+        />
+      );
+    }
+    if (field.type === 'date') {
+      return (
+        <input
+          type="date"
+          style={styles.editInput}
+          value={value as string}
+          disabled={isSaving}
+          onChange={(e) => setDraft(field.key, e.target.value)}
+        />
+      );
+    }
+    return (
+      <input
+        type="text"
+        style={styles.editInput}
+        value={value as string}
+        disabled={isSaving}
+        onChange={(e) => setDraft(field.key, e.target.value)}
+      />
+    );
+  };
 
   const formatFileSize = (bytes: number | null) => {
     if (bytes === null) return '-';
@@ -90,8 +209,12 @@ export function SampleDetailModal({
           <h3 style={styles.sectionTitle}>Metadata Fields</h3>
           <div style={styles.fieldGrid}>
             {fields.map((field) => {
-              const value = sample.fields[field.key];
-              const isFilled = value !== undefined && value !== null && value !== '';
+              const currentValue = sample.fields[field.key];
+              const isFilled = currentValue !== undefined && currentValue !== null && currentValue !== '';
+              const isSaving = saving[field.key] ?? false;
+              const dirty = isDirty(field);
+              const err = fieldErrors[field.key];
+              const wasSaved = saved[field.key] ?? false;
 
               return (
                 <div key={field.key} style={styles.fieldRow}>
@@ -99,12 +222,32 @@ export function SampleDetailModal({
                     {field.key}
                     {field.required && <span style={styles.required}>*</span>}
                   </span>
-                  <span style={{
-                    ...styles.fieldValue,
-                    ...(isFilled ? {} : styles.fieldEmpty),
-                  }}>
-                    {isFilled ? String(value) : '-'}
-                  </span>
+
+                  {canEdit ? (
+                    <div style={styles.editArea}>
+                      {renderFieldInput(field)}
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.saveBtn,
+                          ...(dirty && !isSaving ? {} : styles.saveBtnDisabled),
+                        }}
+                        disabled={!dirty || isSaving}
+                        onClick={() => handleSave(field)}
+                      >
+                        {isSaving ? '…' : 'Save'}
+                      </button>
+                      {err && <span style={styles.fieldError}>{err}</span>}
+                      {wasSaved && !dirty && <span style={styles.fieldSaved}>Saved</span>}
+                    </div>
+                  ) : (
+                    <span style={{
+                      ...styles.fieldValue,
+                      ...(isFilled ? {} : styles.fieldEmpty),
+                    }}>
+                      {isFilled ? String(currentValue) : '-'}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -287,11 +430,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 12px',
     background: '#f9fafb',
     borderRadius: '4px',
+    gap: '12px',
   },
   fieldLabel: {
     fontSize: '14px',
     color: '#374151',
     fontWeight: 500,
+    whiteSpace: 'nowrap' as const,
+    minWidth: '100px',
   },
   required: {
     color: '#dc2626',
@@ -304,6 +450,48 @@ const styles: Record<string, React.CSSProperties> = {
   fieldEmpty: {
     color: '#9ca3af',
     fontStyle: 'italic',
+  },
+  editArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flex: 1,
+    flexWrap: 'wrap' as const,
+  },
+  editInput: {
+    flex: 1,
+    minWidth: '120px',
+    padding: '5px 8px',
+    fontSize: '13px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    background: '#fff',
+    boxSizing: 'border-box' as const,
+  },
+  saveBtn: {
+    padding: '5px 10px',
+    fontSize: '12px',
+    fontWeight: 500,
+    background: '#2563eb',
+    border: 'none',
+    borderRadius: '4px',
+    color: '#fff',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  saveBtnDisabled: {
+    background: '#d1d5db',
+    cursor: 'not-allowed',
+  },
+  fieldError: {
+    fontSize: '12px',
+    color: '#dc2626',
+    width: '100%',
+  },
+  fieldSaved: {
+    fontSize: '12px',
+    color: '#059669',
+    whiteSpace: 'nowrap' as const,
   },
   emptyFiles: {
     padding: '20px',

@@ -34,6 +34,16 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
   // Confirmation dialog state
   const [confirmActivate, setConfirmActivate] = useState<RDMPVersion | null>(null);
 
+  // View modal state
+  const [viewingRDMP, setViewingRDMP] = useState<RDMPVersion | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
+  const handleCopyRDMP = (rdmp: RDMPVersion) => {
+    navigator.clipboard.writeText(JSON.stringify(rdmp.content, null, 2));
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 1500);
+  };
+
   // Reset state when project changes to prevent showing stale data
   useEffect(() => {
     setRdmps([]);
@@ -377,11 +387,54 @@ export function RDMPManagement({ project, onRDMPActivated, userRole }: RDMPManag
                     {rdmp.status === 'ACTIVE' && (
                       <span style={styles.activeNote}>Currently active</span>
                     )}
+                    <button
+                      style={styles.viewButton}
+                      onClick={() => setViewingRDMP(rdmp)}
+                    >
+                      View RDMP
+                    </button>
+                    <button
+                      style={styles.copyButton}
+                      onClick={() => handleCopyRDMP(rdmp)}
+                    >
+                      Copy RDMP
+                    </button>
                   </div>
                 </>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* View RDMP Modal */}
+      {viewingRDMP && (
+        <div style={styles.modalOverlay} onClick={() => setViewingRDMP(null)}>
+          <div style={styles.modalDialog} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Protocol configuration (RDMP)</h3>
+              <span style={styles.modalSubtitle}>{viewingRDMP.title} — v{viewingRDMP.version}</span>
+            </div>
+            <div style={styles.modalBody}>
+              <pre style={styles.modalPre}>
+                {JSON.stringify(viewingRDMP.content, null, 2)}
+              </pre>
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                style={styles.modalCopyButton}
+                onClick={() => handleCopyRDMP(viewingRDMP)}
+              >
+                {copyFeedback ? 'Copied!' : 'Copy'}
+              </button>
+              <button
+                style={styles.cancelButton}
+                onClick={() => setViewingRDMP(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -624,5 +677,91 @@ const styles: Record<string, React.CSSProperties> = {
   disabledButton: {
     opacity: 0.5,
     cursor: 'not-allowed',
+  },
+  viewButton: {
+    padding: '6px 12px',
+    fontSize: '13px',
+    background: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    color: '#374151',
+    cursor: 'pointer',
+  },
+  copyButton: {
+    padding: '6px 12px',
+    fontSize: '13px',
+    background: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    color: '#374151',
+    cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modalDialog: {
+    background: '#fff',
+    borderRadius: '8px',
+    width: '90%',
+    maxWidth: '700px',
+    maxHeight: '85vh',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  },
+  modalHeader: {
+    padding: '20px 24px 16px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  modalTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#111827',
+    margin: '0 0 4px 0',
+  },
+  modalSubtitle: {
+    fontSize: '13px',
+    color: '#6b7280',
+  },
+  modalBody: {
+    flex: 1,
+    overflow: 'auto',
+    padding: '16px 24px',
+  },
+  modalPre: {
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    color: '#374151',
+    background: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '4px',
+    padding: '12px',
+    margin: 0,
+    whiteSpace: 'pre',
+    overflowX: 'auto',
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+  },
+  modalCopyButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    fontWeight: 500,
+    background: '#2563eb',
+    border: 'none',
+    borderRadius: '6px',
+    color: '#fff',
+    cursor: 'pointer',
+    minWidth: '72px',
   },
 };

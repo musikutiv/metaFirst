@@ -145,7 +145,12 @@ function App() {
           setActiveRDMP(activeRdmpData);
           setSamples(samplesResponse.items);
           setRawData(rawDataData);
-          setStorageRoots(storageRootsData);
+          const mappings = await Promise.all(
+            storageRootsData.map((r: StorageRoot) =>
+              apiClient.getStorageRootMappings(r.id).then((ms) => ms[0] ?? null).catch(() => null)
+            )
+          );
+          setStorageRoots(storageRootsData.map((r: StorageRoot, i: number) => ({ ...r, userMapping: mappings[i] })));
           setLabName(labRoleData?.supervisor_name ?? null);
           setUserRole(labRoleData?.role ?? null);
           setPendingIngests(pendingIngestsData);
@@ -347,7 +352,6 @@ function App() {
         fields={fields}
         rawData={rawData}
         loading={loadingData}
-        storageRoots={storageRoots}
         onSelectSample={setSelectedSample}
       />
     );
@@ -573,7 +577,12 @@ function App() {
           rawData={rawData}
           fields={fields}
           storageRoots={storageRoots}
+          userRole={userRole}
           onClose={() => setSelectedSample(null)}
+          onSampleUpdated={(updated) => {
+            setSelectedSample(updated);
+            setSamples(prev => prev.map(s => s.id === updated.id ? updated : s));
+          }}
           onSelectFile={(item) => setSelectedRawDataItem(item)}
         />
       )}

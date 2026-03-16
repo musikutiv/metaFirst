@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { PendingIngest, Project, StorageRoot } from '../types';
+import { getFullLocalPath } from '../utils';
 
 interface IngestInboxProps {
   project: Project;
@@ -36,10 +37,8 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
     return () => clearInterval(interval);
   }, [project.id]);
 
-  const getStorageRootName = (storageRootId: number) => {
-    const root = storageRoots.find(r => r.id === storageRootId);
-    return root?.name || `Storage Root ${storageRootId}`;
-  };
+  const getStorageRoot = (storageRootId: number): StorageRoot | undefined =>
+    storageRoots.find(r => r.id === storageRootId);
 
   const formatFileSize = (bytes: number | null) => {
     if (bytes === null) return '-';
@@ -132,12 +131,26 @@ export function IngestInbox({ project, onSelectIngest, storageRoots, hasActiveRD
               onClick={() => hasActiveRDMP && onSelectIngest(ingest)}
             >
               <div style={styles.cardMain}>
-                <div style={styles.filePath}>{ingest.relative_path}</div>
+                {(() => {
+                  const root = getStorageRoot(ingest.storage_root_id);
+                  const fullPath = root ? getFullLocalPath(root, ingest.relative_path) : null;
+                  const fileName = ingest.relative_path.split('/').pop() ?? ingest.relative_path;
+                  return (
+                    <>
+                      <div style={styles.fileName}>{fileName}</div>
+                      <div style={styles.deviceName}>
+                        {root?.name ?? `Root ${ingest.storage_root_id}`}
+                      </div>
+                      <div style={styles.filePath}>
+                        {fullPath ?? ingest.relative_path}
+                      </div>
+                      {!fullPath && root && (
+                        <div style={styles.noPathNote}>(no local path configured)</div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div style={styles.cardMeta}>
-                  <span style={styles.storageRoot}>
-                    {getStorageRootName(ingest.storage_root_id)}
-                  </span>
-                  <span style={styles.separator}>|</span>
                   <span>{formatFileSize(ingest.file_size_bytes)}</span>
                   <span style={styles.separator}>|</span>
                   <span>{formatDate(ingest.created_at)}</span>
@@ -240,23 +253,38 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minWidth: 0,
   },
-  filePath: {
+  fileName: {
     fontSize: '14px',
-    fontWeight: 500,
+    fontWeight: 600,
     color: '#111827',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  deviceName: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#2563eb',
+    marginTop: '1px',
+  },
+  filePath: {
+    fontSize: '11px',
+    color: '#6b7280',
     fontFamily: 'monospace',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  noPathNote: {
+    fontSize: '11px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginTop: '1px',
+  },
   cardMeta: {
     fontSize: '12px',
     color: '#6b7280',
     marginTop: '4px',
-  },
-  storageRoot: {
-    color: '#2563eb',
-    fontWeight: 500,
   },
   separator: {
     margin: '0 6px',

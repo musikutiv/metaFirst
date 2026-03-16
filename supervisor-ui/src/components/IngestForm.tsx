@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import type { PendingIngest, RDMPField, Sample, StorageRoot, RDMP, FileAnnotationCreate, RDMPRunField } from '../types';
+import { getFullLocalPath } from '../utils';
 
 interface IngestFormProps {
   ingest: PendingIngest;
@@ -272,13 +273,21 @@ export function IngestForm({
       {/* File Info Section */}
       <div style={styles.fileInfo}>
         <div style={styles.fileInfoRow}>
-          <span style={styles.fileInfoLabel}>File:</span>
-          <span style={styles.filePath}>{ingest.relative_path}</span>
+          <span style={styles.fileInfoLabel}>Device:</span>
+          <span>{storageRoot?.name ?? `Root ${ingest.storage_root_id}`}</span>
         </div>
         <div style={styles.fileInfoRow}>
-          <span style={styles.fileInfoLabel}>Storage Root:</span>
-          <span>{storageRoot?.name || `ID ${ingest.storage_root_id}`}</span>
+          <span style={styles.fileInfoLabel}>File:</span>
+          <span style={styles.filePath}>
+            {storageRoot ? (getFullLocalPath(storageRoot, ingest.relative_path) ?? ingest.relative_path) : ingest.relative_path}
+          </span>
         </div>
+        {storageRoot && !storageRoot.userMapping?.local_mount_path && (
+          <div style={styles.fileInfoRow}>
+            <span style={styles.fileInfoLabel} />
+            <span style={styles.noPathNote}>(no local path configured)</span>
+          </div>
+        )}
         <div style={styles.fileInfoRow}>
           <span style={styles.fileInfoLabel}>Size:</span>
           <span>{formatFileSize(ingest.file_size_bytes)}</span>
@@ -556,6 +565,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     color: '#111827',
     wordBreak: 'break-all',
+  },
+  noPathNote: {
+    fontSize: '12px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   hash: {
     fontFamily: 'monospace',
