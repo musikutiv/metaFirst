@@ -120,7 +120,7 @@ open_browser: true
 watchers:
   - watch_path: /Users/alice/data/western_blot
     project_name: "Membrane Proteins 2026"
-    storage_root_name: "LOCAL_DATA"
+    storage_root_name: "Microscope workstation"
 ```
 
 Replace `<lab-server>` with the address your Lab lead gave you.
@@ -141,7 +141,7 @@ Bound to supervisor: Membrane Proteins Lab (id=1)
 Resolved watcher mappings:
   /Users/alice/data/western_blot
     -> project: Membrane Proteins 2026 (id=3)
-    -> storage_root: LOCAL_DATA (id=7)
+    -> storage_root: Microscope workstation (id=7)
 ```
 
 If the banner shows an error, see [Known Issues](#known-issues).
@@ -244,8 +244,7 @@ Use consistent, descriptive filenames before saving to the watch folder.
 If your password changes, update the config file and restart the helper.
 If your account is not a member of the project listed in the config, the helper logs a rejection and skips the file.
 
-**Multiple samples per file.** There is no dedicated multi-sample-per-file feature.
-Record the sample mapping in a notes or free-text field (see the western blot example above).
+**Multiple samples per file.** Projects configured for multi-sample mode (qPCR plates and similar instruments) support a dedicated multi-sample ingest flow. When you open the finalize screen for such a file, you will see a measured-samples grid instead of the single-sample form — add one row per sample in the run. If your project does not have this configured but you need it, ask your Steward to add an `ingest.measured_samples_mode: "multi"` section to the RDMP. For projects in single-sample mode, record sample-to-lane or sample-to-position mappings in a notes or free-text field (see the western blot example above).
 
 **Protocol in draft.** If the project protocol has not been activated yet, the metadata form does not appear.
 The file is still detected and a pending entry is created — it shows up in the project overview.

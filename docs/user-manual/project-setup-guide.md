@@ -228,6 +228,17 @@ containing measurements for many samples, such as a qPCR plate reader):
 | `index_fields` | Column headers shown in the measured-samples grid (e.g. well position, gene target). |
 | `run_fields` | Metadata about the run as a whole (e.g. reagent batch, instrument ID). |
 
+### Viewing or copying an RDMP
+
+From the **RDMPs** page you can inspect any RDMP version without editing it:
+
+- **View RDMP** — opens a read-only modal showing the full JSON configuration.
+- **Copy RDMP** — copies the JSON to your clipboard so you can use it as a
+  starting point for a revised version.
+
+Both buttons appear on every card regardless of the RDMP's status (Draft, Active,
+or Superseded).
+
 ### Updating an RDMP
 
 When the experiment protocol changes — new fields required, roles revised — create
@@ -235,7 +246,8 @@ a new RDMP version rather than editing the active one:
 
 1. Go to **RDMPs** in the project sidebar.
 2. Click **Create RDMP**.
-3. Paste the revised JSON.
+3. Paste the revised JSON (tip: use **Copy RDMP** on the current active version
+   and modify the copy).
 4. Have a PI activate it.
 
 The previous RDMP is marked **Superseded**. All entries created under the old RDMP
@@ -247,12 +259,23 @@ retain their original field definitions in the history.
 
 ### Why storage roots are required
 
-A **storage root** is a named storage location — a filesystem path, network share,
-or cloud prefix — that metaFirst knows about. Every ingested file is recorded relative
-to a storage root. The system does not copy or move files; it records the path only.
+A **storage root** is a named device or storage location registered in the project.
+Every ingested file is recorded as a `(storage root, relative path)` pair. The system
+does not copy or move files; it records the path only.
 
-The ingest helper and the permission system both require at least one storage root to
-exist before files can be submitted to a project.
+At least one storage root must exist before files can be submitted to a project.
+
+### Two-level path model
+
+Storage roots use a two-level path design:
+
+| Level | Field | Who sets it | Purpose |
+|---|---|---|---|
+| Device name | `storage_roots.name` | PI / Steward (project-wide) | Logical label for the device or share, used in the ingest helper config and audit records |
+| Local path | `storage_root_mappings.local_mount_path` | Each user (personal) | The filesystem path where *this user* accesses that device — may differ per machine |
+
+The ingest helper uses `watch_path` from its own YAML config; the local path
+mapping is used by the UI to display reconstructed full paths alongside file entries.
 
 ### How
 
@@ -261,8 +284,10 @@ exist before files can be submitted to a project.
 2. Scroll to the **Storage Roots** section.
 
 3. Fill in:
-   - **Name** — a short identifier used in the ingest helper config file and in the UI.
-     Example: `LOCAL_DATA`, `LAB_NAS_2024`.
+   - **Device name** — a human-readable label for the physical device or share.
+     Examples: `NovaSeq output NAS`, `Microscope workstation`, `Lab NAS 2024`.
+     This name is used in the ingest helper config (`storage_root_name`) and must be
+     matched exactly (case-sensitive).
    - **Description** — optional. A note about what this storage location is.
 
 4. Click **Add Storage Root**.
@@ -275,20 +300,33 @@ exist before files can be submitted to a project.
    > the RDMP has been activated and that it defines a `PI` role with
    > `can_manage_rdmp: true`.
 
+5. **Set your local path (per user).**
+
+   After the storage root is created, each team member should click **Set local path**
+   next to the root and enter the path where they access that device on their machine.
+   For example: `/mnt/nas/novaseq` or `/Volumes/LabNAS`.
+
+   This mapping is personal — each user sets their own path. The UI uses it to
+   display reconstructed full file paths in the ingest inbox and file views.
+   If no mapping is set, the relative path is shown instead.
+
 ### Relation to local watch folders
 
-The ingest helper config references a storage root by its **exact name**:
+The ingest helper config references a storage root by its **device name**:
 
 ```yaml
 watchers:
   - watch_path: /Users/alice/data/qpcr_runs
     project_name: "qPCR Oncology 2026"
-    storage_root_name: "LOCAL_DATA"
+    storage_root_name: "NovaSeq output NAS"
 ```
 
-The name in `storage_root_name` must match the name you entered in the Settings page
-exactly, including capitalisation. If the names do not match the helper exits at
-startup with a "storage root not found" error.
+The value of `storage_root_name` must match the device name you entered in the
+Settings page exactly, including capitalisation. If the names do not match the
+helper exits at startup with a "storage root not found" error.
+
+The `watch_path` in the config is the local folder the helper monitors on this
+machine; it is independent of the local path mapping set in the UI.
 
 ---
 
@@ -324,7 +362,10 @@ If `open_browser: true` is set in the config, a browser tab opens directly to th
 **Add Data** screen for that file.
 
 The screen shows:
-- File path, storage root, size, and SHA-256 hash.
+- **Device** — the storage root name (device label).
+- **File** — the full reconstructed path (`local mount path + relative path`) if
+  you have set your local path mapping, otherwise the relative path only.
+- File size and SHA-256 hash.
 - Any sample identifier automatically extracted from the filename (if a filename
   regex rule is configured in project Settings).
 
