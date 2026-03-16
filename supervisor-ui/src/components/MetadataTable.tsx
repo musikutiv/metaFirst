@@ -1,45 +1,25 @@
 import { useMemo } from 'react';
-import type { Sample, RDMPField, RawDataItem, StorageRoot } from '../types';
+import type { Sample, RDMPField, RawDataItem } from '../types';
 
 interface MetadataTableProps {
   samples: Sample[];
   fields: RDMPField[];
   rawData: RawDataItem[];
   loading: boolean;
-  storageRoots?: StorageRoot[];
   onSelectSample?: (sample: Sample) => void;
 }
 
-export function MetadataTable({ samples, fields, rawData, loading, storageRoots = [], onSelectSample }: MetadataTableProps) {
-  // Build a map of sample_id -> raw data info
-  const rawDataBySample = useMemo(() => {
-    const data: Record<number, { count: number; storageRootIds: Set<number> }> = {};
+export function MetadataTable({ samples, fields, rawData, loading, onSelectSample }: MetadataTableProps) {
+  // Build a map of sample_id -> file count
+  const fileCountBySample = useMemo(() => {
+    const counts: Record<number, number> = {};
     for (const item of rawData) {
       if (item.sample_id) {
-        if (!data[item.sample_id]) {
-          data[item.sample_id] = { count: 0, storageRootIds: new Set() };
-        }
-        data[item.sample_id].count += 1;
-        data[item.sample_id].storageRootIds.add(item.storage_root_id);
+        counts[item.sample_id] = (counts[item.sample_id] ?? 0) + 1;
       }
     }
-    return data;
+    return counts;
   }, [rawData]);
-
-  // Build storage root name lookup
-  const storageRootNames = useMemo(() => {
-    const names: Record<number, string> = {};
-    for (const root of storageRoots) {
-      names[root.id] = root.name;
-    }
-    return names;
-  }, [storageRoots]);
-
-  const getStorageRootNames = (storageRootIds: Set<number>) => {
-    return Array.from(storageRootIds)
-      .map(id => storageRootNames[id] || `Root ${id}`)
-      .join(', ');
-  };
 
   if (loading) {
     return <div style={styles.loading}>Loading samples...</div>;
@@ -80,17 +60,12 @@ export function MetadataTable({ samples, fields, rawData, loading, storageRoots 
                 </th>
               ))}
               <th style={styles.th}>Files</th>
-              <th style={styles.th}>Storage Roots</th>
               <th style={styles.th}>Status</th>
             </tr>
           </thead>
           <tbody>
             {samples.map((sample) => {
-              const sampleData = rawDataBySample[sample.id];
-              const fileCount = sampleData?.count || 0;
-              const storageRootDisplay = sampleData
-                ? getStorageRootNames(sampleData.storageRootIds)
-                : '-';
+              const fileCount = fileCountBySample[sample.id] ?? 0;
 
               return (
                 <tr
@@ -112,11 +87,6 @@ export function MetadataTable({ samples, fields, rawData, loading, storageRoots 
                   <td style={styles.td}>
                     <span style={styles.fileCount}>
                       {fileCount}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={styles.storageRoots}>
-                      {storageRootDisplay}
                     </span>
                   </td>
                   <td style={styles.td}>
@@ -248,11 +218,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
     fontSize: '12px',
     fontWeight: 500,
-  },
-  storageRoots: {
-    fontSize: '12px',
-    color: '#6b7280',
-    fontStyle: 'italic',
   },
   complete: {
     color: '#059669',

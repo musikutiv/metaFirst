@@ -352,7 +352,6 @@ function App() {
         fields={fields}
         rawData={rawData}
         loading={loadingData}
-        storageRoots={storageRoots}
         onSelectSample={setSelectedSample}
       />
     );
